@@ -42,6 +42,14 @@
 
     #teacher-virtual-cam { width: 100%; height: 100%; background: #27272a; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     #virtual-board { width: 360px; height: 360px; background: #fff; }
+
+    /* Полноэкранный режим доски */
+    #fullscreen-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+    .fullscreen-content { background: #fff; padding: 25px; border-radius: 12px; display: flex; gap: 20px; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    #fullscreen-board { width: 450px; height: 450px; }
+    .piece-shelf { display: flex; flex-direction: column; gap: 6px; background: #f4f5f7; padding: 10px; border-radius: 6px; border: 1px solid #ccc; }
+    .shelf-row { display: flex; gap: 4px; justify-content: center; }
+    .shelf-piece { width: 35px; height: 35px; cursor: grab; background-size: cover; }
   </style>
 </head>
 <body>
@@ -147,6 +155,11 @@
         <!-- Главная доска -->
         <div id="board"></div>
 
+        <!-- Кнопка полноэкранного режима доски -->
+        <div style="text-align: center; margin-top: 6px;">
+          <button onclick="toggleFullscreenBoard()" style="background: #595959; font-size: 11px; padding: 5px 10px; width: 100%;">🔲 Развернуть доску (на полэкрана)</button>
+        </div>
+
         <!-- Блок трансляций для учителя -->
         <div id="teacher-monitoring" class="hidden" style="margin-top: 15px; border-top: 2px solid #ccc; padding-top: 10px;">
           <h4 style="margin: 0 0 8px 0; font-size: 14px; color: #0052cc;">Панель учителя:</h4>
@@ -160,23 +173,62 @@
     </div>
   </div>
 
+  <!-- Оверлей полноэкранной доски -->
+  <div id="fullscreen-overlay" class="hidden">
+    <div class="fullscreen-content">
+      <div>
+        <h3 style="margin-top:0; color:#0052cc;">Полноэкранный режим доски</h3>
+        <div id="fullscreen-board"></div>
+        <div style="margin-top: 10px; text-align: center;">
+          <button onclick="toggleFullscreenBoard()" style="background: #36b37e;">Закрыть полноэкранный режим</button>
+        </div>
+      </div>
+      <!-- Панель инструментов в полноэкранном режиме (только если учитель не в партии) -->
+      <div id="fullscreen-teacher-panel" class="hidden piece-shelf">
+        <div style="font-size: 12px; font-weight: bold; text-align:center;">Инструменты</div>
+        <button onclick="resetTeacherBoard()" style="background: #0052cc; font-size: 10px; padding: 4px;">Начальная позиция</button>
+        <button onclick="clearTeacherBoard()" style="background: #ff5630; font-size: 10px; padding: 4px;">Очистить доску</button>
+        <div style="font-size: 11px; font-weight: bold; margin-top:5px; text-align:center;">Фигуры</div>
+        <div class="shelf-row">
+          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/wK.png')" draggable="true" ondragstart="onShelfDrag(event, 'wK')"></div>
+          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/wQ.png')" draggable="true" ondragstart="onShelfDrag(event, 'wQ')"></div>
+          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/wR.png')" draggable="true" ondragstart="onShelfDrag(event, 'wR')"></div>
+        </div>
+        <div class="shelf-row">
+          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/wB.png')" draggable="true" ondragstart="onShelfDrag(event, 'wB')"></div>
+          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/wN.png')" draggable="true" ondragstart="onShelfDrag(event, 'wN')"></div>
+          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/wP.png')" draggable="true" ondragstart="onShelfDrag(event, 'wP')"></div>
+        </div>
+        <hr style="width:100%; margin:4px 0;">
+        <div class="shelf-row">
+          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/bK.png')" draggable="true" ondragstart="onShelfDrag(event, 'bK')"></div>
+          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/bQ.png')" draggable="true" ondragstart="onShelfDrag(event, 'bQ')"></div>
+          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/bR.png')" draggable="true" ondragstart="onShelfDrag(event, 'bR')"></div>
+        </div>
+        <div class="shelf-row">
+          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/bB.png')" draggable="true" ondragstart="onShelfDrag(event, 'bB')"></div>
+          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/bN.png')" draggable="true" ondragstart="onShelfDrag(event, 'bN')"></div>
+          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/bP.png')" draggable="true" ondragstart="onShelfDrag(event, 'bP')"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const usersDB = {
-      // Ученики
-      "Murik-855": { type: "student", name: "Мурад Солтанов", pass: "865789", rating: 100, teacher: "Гафур Мустафа" },
-      "kenancik228": { type: "student", name: "Кянан Алиев", pass: "263573", rating: 100, teacher: "Гафур Мустафа" },
-      "redjohn335": { type: "student", name: "Исмаилов Омяр", pass: "937637", rating: 950, teacher: "Гафур Мустафа" },
-      "professor-562": { type: "student", name: "Джавад Багырлы", pass: "023846", rating: 150, teacher: "Гафур Мустафа" },
-      "more788": { type: "student", name: "Дениз Новрузлу", pass: "040567", rating: 450, teacher: "Гафур Мустафа" },
-      "elsik487": { type: "student", name: "Эльсевер Гусейнов", pass: "437598", rating: 380, teacher: "Гафур Мустафа" },
-
-      // Учителя
+      "Murik-855": { type: "student", name: "Мурад Солтанов", pass: "865789", rating: 1450, teacher: "Гафур Мустафа" },
+      "kenancik228": { type: "student", name: "Кянан Алиев", pass: "263573", rating: 1300, teacher: "Гафур Мустафа" },
+      "redjohn335": { type: "student", name: "Исмаилов Омяр", pass: "937637", rating: 1350, teacher: "Гафур Мустафа" },
+      "professor-562": { type: "student", name: "Джавад Багырлы", pass: "023846", rating: 1400, teacher: "Гафур Мустафа" },
+      "more788": { type: "student", name: "Дениз Новрузлу", pass: "040567", rating: 1250, teacher: "Гафур Мустафа" },
+      "elsik437": { type: "student", name: "Эльсевер Гусейнов", pass: "487598", rating: 380, teacher: "Гафур Мустафа" },
       "MrQafri-0620": { type: "teacher", name: "Гафур Мустафа", pass: "0620" },
       "PatrickJane2": { type: "teacher", name: "Угур Иманлы", pass: "qoqoqo" }
     };
 
     let board = null;
     let virtualBoard = null;
+    let fullscreenBoard = null;
     let game = new Chess();
     let currentUserName = "";
     let currentUserType = "";
@@ -184,6 +236,7 @@
     let activeGameId = null;
     let opponentName = null;
     let isVirtualCamActive = false;
+    let isFullscreenOpen = false;
 
     let whiteTime = 600;
     let blackTime = 600;
@@ -269,6 +322,7 @@
           game.load(savedFen);
           if (board) board.position(savedFen, false);
           if (virtualBoard) virtualBoard.position(savedFen, false);
+          if (fullscreenBoard) fullscreenBoard.position(savedFen, false);
         }
       }
 
@@ -369,6 +423,9 @@
       if (virtualBoard) {
         virtualBoard.position('start');
       }
+      if (fullscreenBoard) {
+        fullscreenBoard.position('start');
+      }
 
       whiteTime = 600;
       blackTime = 600;
@@ -433,8 +490,9 @@
         updateTimerDisplay();
       }
       
-      board.position(game.fen());
+      if (board) board.position(game.fen());
       if (virtualBoard) virtualBoard.position(game.fen());
+      if (fullscreenBoard) fullscreenBoard.position(game.fen());
 
       if (activeGameId) {
         localStorage.setItem(`match_fen_${activeGameId}`, game.fen());
@@ -463,6 +521,7 @@
       game.reset();
       if (board) board.position('start');
       if (virtualBoard) virtualBoard.position('start');
+      if (fullscreenBoard) fullscreenBoard.position('start');
       if (activeGameId) {
         localStorage.removeItem(`match_fen_${activeGameId}`);
         localStorage.removeItem(`match_resigned_${activeGameId}`);
@@ -575,8 +634,9 @@
         if (gKey.startsWith('match_fen_') && gKey.includes(userName)) {
           let fen = localStorage.getItem(gKey);
           game.load(fen);
-          board.position(fen);
+          if (board) board.position(fen);
           if (virtualBoard) virtualBoard.position(fen);
+          if (fullscreenBoard) fullscreenBoard.position(fen);
           activeGameId = gKey.replace('match_fen_', '');
           alert(`Учитель открыл демонстрацию партии игрока: ${userName}`);
           return;
@@ -588,8 +648,9 @@
     function showTeacherBoard() {
       endGameCleanUp();
       game.reset();
-      board.position('start');
+      if (board) board.position('start');
       if (virtualBoard) virtualBoard.position('start');
+      if (fullscreenBoard) fullscreenBoard.position('start');
       localStorage.removeItem('teacher_virtual_cam_fen');
       document.getElementById('color-info').innerText = "Ваша личная доска (можно двигать фигуры)";
       alert("Открыта ваша личная свободная доска.");
@@ -597,16 +658,18 @@
 
     function resetTeacherBoard() {
       game.reset();
-      board.position('start');
+      if (board) board.position('start');
       if (virtualBoard) virtualBoard.position('start');
+      if (fullscreenBoard) fullscreenBoard.position('start');
       if (isVirtualCamActive) localStorage.setItem('teacher_virtual_cam_fen', game.fen());
       localStorage.setItem('teacher_broadcast_fen', game.fen());
     }
 
     function clearTeacherBoard() {
       game.clear();
-      board.position('empty');
+      if (board) board.position('empty');
       if (virtualBoard) virtualBoard.position('empty');
+      if (fullscreenBoard) fullscreenBoard.position('empty');
       if (isVirtualCamActive) localStorage.setItem('teacher_virtual_cam_fen', game.fen());
       localStorage.setItem('teacher_broadcast_fen', game.fen());
     }
@@ -639,6 +702,70 @@
         alert("Включена обратно видеокамера.");
       }
     }
+
+    // Управление полноэкранным режимом доски
+    function toggleFullscreenBoard() {
+      isFullscreenOpen = !isFullscreenOpen;
+      const overlay = document.getElementById('fullscreen-overlay');
+      const teacherPanel = document.getElementById('fullscreen-teacher-panel');
+
+      if (isFullscreenOpen) {
+        overlay.classList.remove('hidden');
+        if (currentUserType === 'teacher' && !activeGameId) {
+          teacherPanel.classList.remove('hidden');
+        } else {
+          teacherPanel.classList.add('hidden');
+        }
+
+        setTimeout(() => {
+          if (!fullscreenBoard) {
+            fullscreenBoard = Chessboard('fullscreen-board', {
+              draggable: true,
+              position: game.fen(),
+              dropOffBoard: 'trash',
+              onDragStart: onDragStart,
+              onDrop: onDrop,
+              pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+            });
+          } else {
+            fullscreenBoard.position(game.fen());
+          }
+        }, 100);
+      } else {
+        overlay.classList.add('hidden');
+      }
+    }
+
+    // Перетаскивание фигур с панели расстановки
+    function onShelfDrag(event, pieceCode) {
+      event.dataTransfer.setData('text/plain', pieceCode);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.body.addEventListener('dragover', (e) => e.preventDefault());
+      document.body.addEventListener('drop', (e) => {
+        const piece = e.dataTransfer.getData('text/plain');
+        if (piece && isFullscreenOpen && currentUserType === 'teacher' && !activeGameId) {
+          // Если перетащили на доску
+          const boardEl = document.getElementById('fullscreen-board');
+          const rect = boardEl.getBoundingClientRect();
+          if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+            let x = Math.floor((e.clientX - rect.left) / (rect.width / 8));
+            let y = Math.floor((e.clientY - rect.top) / (rect.height / 8));
+            let files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+            let ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
+            let square = files[x] + ranks[y];
+
+            game.put({ type: piece[1].toLowerCase(), color: piece[0] }, square);
+            if (board) board.position(game.fen());
+            if (virtualBoard) virtualBoard.position(game.fen());
+            if (fullscreenBoard) fullscreenBoard.position(game.fen());
+            if (isVirtualCamActive) localStorage.setItem('teacher_virtual_cam_fen', game.fen());
+            localStorage.setItem('teacher_broadcast_fen', game.fen());
+          }
+        }
+      });
+    });
   </script>
 </body>
 </html>
