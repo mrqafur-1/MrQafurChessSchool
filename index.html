@@ -121,7 +121,6 @@
           <button onclick="openChallengeList()">Кинуть вызов</button>
           <div id="users-dropdown" class="modal-list hidden"></div>
           
-          <!-- Кнопки управления партией -->
           <div id="game-action-btns" class="hidden" style="margin-top: 8px;">
             <button class="danger-btn" onclick="resignGame()" style="font-size: 12px; padding: 6px 10px;">Сдаться</button>
             <button onclick="offerDraw()" style="background: #ffab00; font-size: 12px; padding: 6px 10px;">Ничья</button>
@@ -133,8 +132,9 @@
 
         <!-- Блок трансляций для учителя -->
         <div id="teacher-monitoring" class="hidden" style="margin-top: 15px; border-top: 2px solid #ccc; padding-top: 10px;">
-          <h4 style="margin: 0 0 8px 0; font-size: 14px; color: #0052cc;">Трансляции партий учеников:</h4>
-          <button onclick="showTeacherBoard()" style="background: #0052cc; font-size: 11px; padding: 5px 10px; margin-bottom: 8px;">Показать мою доску</button>
+          <h4 style="margin: 0 0 8px 0; font-size: 14px; color: #0052cc;">Панель учителя:</h4>
+          <button onclick="showTeacherBoard()" style="background: #0052cc; font-size: 11px; padding: 5px 10px; margin-bottom: 6px;">Моя доска</button>
+          <button onclick="broadcastTeacherBoard()" style="background: #36b37e; font-size: 11px; padding: 5px 10px; margin-bottom: 6px;">Транслировать ученикам</button>
           <div class="mini-boards-container" id="mini-boards-grid"></div>
         </div>
 
@@ -158,8 +158,9 @@
     let game = new Chess();
     let currentUserName = "";
     let currentUserType = "";
-    let myAssignedColor = null; // 'white' или 'black'
+    let myAssignedColor = null; 
     let activeGameId = null;
+    let opponentName = null;
 
     let whiteTime = 600;
     let blackTime = 600;
@@ -230,7 +231,16 @@
         localStorage.removeItem('chess_draw_target');
       }
 
-      // Синхронизация ходов активной партии
+      // Проверка сдачи соперника
+      if (activeGameId) {
+        const resignedBy = localStorage.getItem(`match_resigned_${activeGameId}`);
+        if (resignedBy && resignedBy !== currentUserName) {
+          alert("Соперник сдался! Вы победили 🎉");
+          endGameCleanUp();
+        }
+      }
+
+      // Синхронизация ходов активной партии для учеников
       if (activeGameId && currentUserType === 'student') {
         let savedFen = localStorage.getItem(`match_fen_${activeGameId}`);
         if (savedFen && savedFen !== game.fen()) {
@@ -239,6 +249,18 @@
         }
       }
 
+      // Если идет трансляция от учителя
+      if (currentUserType === 'student') {
+        let teacherBroadcast = localStorage.getItem('teacher_broadcast_fen');
+        if (teacherBroadcast && teacherBroadcast !== window.lastTeacherFen) {
+          window.lastTeacherFen = teacherBroadcast;
+          game.load(teacherBroadcast);
+          if (board) board.position(teacherBroadcast, false);
+          document.getElementById('color-info').innerText = "Демонстрация от учителя";
+        }
+      }
+
+      // Если это учитель, обновляем мини-доски
       if (currentUserType === 'teacher' && !document.getElementById('lesson-room').classList.contains('hidden')) {
         updateTeacherMiniBoards();
       }
@@ -251,7 +273,7 @@
 
       for (let key in usersDB) {
         let u = usersDB[key];
-        if (u.name !== currentUserName && u.type === 'student') {
+        if (u.name !== currentUserName) {
           let item = document.createElement('div');
           item.className = 'user-item';
           item.innerText = u.name;
@@ -267,7 +289,15 @@
     function sendChallenge(receiverName) {
       localStorage.setItem('chess_challenger_name', currentUserName);
       localStorage.setItem('chess_challenge_target', receiverName);
-      alert(`Вы отправили вызов игроку: ${receiverName}`);
+      opponentName = receiverName;
+      activeGameId = [currentUserName, receiverName].sort().join('_vs_');
+      myAssignedColor = 'white';
+      
+      localStorage.removeItem(`match_resigned_${activeGameId}`);
+      alert(`Вы отправили вызов игроку: ${receiverName}. Вы играете БЕЛЫХ ♔`);
+      document.getElementById('color-info').innerText = `Ваш цвет: Белые ♔`;
+      document.getElementById('game-action-btns').classList.remove('hidden');
+      startNewGame('white');
     }
 
     function acceptChallenge() {
@@ -275,11 +305,11 @@
       document.getElementById('incoming-challenge').classList.add('hidden');
       
       const challenger = localStorage.getItem('chess_challenger_name');
+      opponentName = challenger;
       activeGameId = [currentUserName, challenger].sort().join('_vs_');
-
-      // Определяем цвета (кто бросил — белые, кто принял — черные)
       myAssignedColor = 'black';
       
+      localStorage.removeItem(`match_resigned_${activeGameId}`);
       alert(`Вызов принят! Вы играете за ЧЕРНЫХ ♚`);
       document.getElementById('color-info').innerText = `Ваш цвет: Черные ♚`;
       document.getElementById('game-action-btns').classList.remove('hidden');
@@ -306,6 +336,10 @@
       
       if (timerInterval) clearInterval(timerInterval);
       timerInterval = setInterval(runTimer, 1000);
+      
+      if (activeGameId) {
+        localStorage.setItem(`match_fen_${activeGameId}`, game.fen());
+      }
     }
 
     function runTimer() {
@@ -328,15 +362,16 @@
       document.getElementById('black-timer').innerText = format(blackTime);
     }
 
-    // Правила ходов с проверкой цвета игрока
+    // Правила ходов
     function onDragStart (source, piece) {
-      if (currentUserType === 'teacher') return false;
+      if (currentUserType === 'teacher' && !window.teacherCanPlay) return false;
       if (game.game_over()) return false;
 
-      // Проверка: может ли игрок двигать свои фигуры
-      if (myAssignedColor === 'white' && piece.search(/^b/) !== -1) return false;
-      if (myAssignedColor === 'black' && piece.search(/^w/) !== -1) return false;
-      if (game.turn() !== myAssignedColor[0]) return false; // Не ваш ход
+      if (currentUserType === 'student') {
+        if (myAssignedColor === 'white' && piece.search(/^b/) !== -1) return false;
+        if (myAssignedColor === 'black' && piece.search(/^w/) !== -1) return false;
+        if (game.turn() !== myAssignedColor[0]) return false; 
+      }
     }
 
     function onDrop (source, target) {
@@ -347,27 +382,41 @@
       updateTimerDisplay();
       board.position(game.fen());
 
-      // Сохраняем ход в память для синхронизации
-      if (activeGameId) {
+      if (activeGameId && currentUserType === 'student') {
         localStorage.setItem(`match_fen_${activeGameId}`, game.fen());
+      }
+      if (currentUserType === 'teacher' && window.teacherCanPlay) {
+        localStorage.setItem('teacher_broadcast_fen', game.fen());
       }
     }
 
     // Сдаться
     function resignGame() {
       if (confirm("Вы уверены, что хотите сдаться?")) {
+        if (activeGameId) {
+          localStorage.setItem(`match_resigned_${activeGameId}`, currentUserName);
+        }
         alert("Вы признали поражение.");
-        document.getElementById('game-action-btns').classList.add('hidden');
-        if (timerInterval) clearInterval(timerInterval);
+        endGameCleanUp();
       }
     }
 
-    // Предложить ничью
+    function endGameCleanUp() {
+      document.getElementById('game-action-btns').classList.add('hidden');
+      if (timerInterval) clearInterval(timerInterval);
+      game.reset();
+      if (board) board.position('start');
+      if (activeGameId) {
+        localStorage.removeItem(`match_fen_${activeGameId}`);
+        localStorage.removeItem(`match_resigned_${activeGameId}`);
+      }
+      activeGameId = null;
+    }
+
+    // Ничья
     function offerDraw() {
-      const challenger = localStorage.getItem('chess_challenger_name');
-      const target = challenger === currentUserName ? localStorage.getItem('chess_challenge_target') : challenger;
-      if (target) {
-        localStorage.setItem('chess_draw_target', target);
+      if (opponentName) {
+        localStorage.setItem('chess_draw_target', opponentName);
         alert("Предложение ничьей отправлено сопернику.");
       }
     }
@@ -375,7 +424,7 @@
     function acceptDraw() {
       document.getElementById('incoming-draw').classList.add('hidden');
       alert("Ничья принята! Партия завершена.");
-      if (timerInterval) clearInterval(timerInterval);
+      endGameCleanUp();
     }
 
     function rejectDraw() {
@@ -392,13 +441,14 @@
       if (currentUserType === 'teacher') {
         document.getElementById('user-controls').classList.add('hidden');
         document.getElementById('teacher-monitoring').classList.remove('hidden');
-        document.getElementById('color-info').innerText = "Режим учителя: Наблюдение и трансляции";
+        document.getElementById('color-info').innerText = "Режим учителя: Управление и трансляции";
+        window.teacherCanPlay = true; // Учитель может двигать фигуры на своей доске
       }
 
       setTimeout(() => {
         if (!board) {
           board = Chessboard('board', {
-            draggable: currentUserType === 'student',
+            draggable: true,
             position: 'start',
             onDragStart: onDragStart,
             onDrop: onDrop,
@@ -408,26 +458,12 @@
       }, 400);
     }
 
-    // Если инициатор отправляет вызов
-    const originalSendChallenge = window.sendChallenge;
-    window.sendChallenge = function(receiverName) {
-      localStorage.setItem('chess_challenger_name', currentUserName);
-      localStorage.setItem('chess_challenge_target', receiverName);
-      activeGameId = [currentUserName, receiverName].sort().join('_vs_');
-      myAssignedColor = 'white';
-      
-      alert(`Вы отправили вызов игроку: ${receiverName}. Вы играете БЕЛЫМИ ♔`);
-      document.getElementById('color-info').innerText = `Ваш цвет: Белые ♔`;
-      document.getElementById('game-action-btns').classList.remove('hidden');
-      startNewGame('white');
-    };
-
     function updateTeacherMiniBoards() {
       const grid = document.getElementById('mini-boards-grid');
+      
       for (let key in usersDB) {
         let u = usersDB[key];
         if (u.type === 'student') {
-          // Ищем любую активную партию ученика
           let fen = 'start';
           for (let gKey in localStorage) {
             if (gKey.startsWith('match_fen_') && gKey.includes(u.name)) {
@@ -446,22 +482,17 @@
             card.innerHTML = `
               <span>${u.name}</span>
               <div class="mini-board" id="board_${key}"></div>
-              <button onclick="broadcastStudent('${u.name}')" style="font-size:10px; padding:2px 6px; margin-top:4px; background:#0052cc;">Демонстрация</button>
+              <button onclick="broadcastStudent('${u.name}')" style="font-size:10px; padding:2px 6px; margin-top:4px; background:#0052cc;">Демо</button>
             `;
             grid.appendChild(card);
 
-            Chessboard(`board_${key}`, {
+            window[`miniObj_${key}`] = Chessboard(`board_${key}`, {
               position: fen,
               pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
             });
           } else {
             let boardObj = window[`miniObj_${key}`];
-            if (!boardObj) {
-              window[`miniObj_${key}`] = Chessboard(`board_${key}`, {
-                position: fen,
-                pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
-              });
-            } else {
+            if (boardObj) {
               boardObj.position(fen);
             }
           }
@@ -479,13 +510,19 @@
           return;
         }
       }
-      alert("У этого игрока пока нет активной партии.");
+      alert("У этого игрока активная доска пуста или партия не начата.");
     }
 
     function showTeacherBoard() {
       game.reset();
       board.position('start');
-      alert("На главном экране отображается стандартная доска учителя.");
+      localStorage.removeItem('teacher_broadcast_fen');
+      alert("Открыта ваша личная доска.");
+    }
+
+    function broadcastTeacherBoard() {
+      localStorage.setItem('teacher_broadcast_fen', game.fen());
+      alert("Ваша доска транслируется всем ученикам!");
     }
   </script>
 </body>
