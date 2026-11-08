@@ -25,6 +25,12 @@
     #chess-sidebar { width: 360px; background: #f4f5f7; padding: 15px; border-radius: 8px; box-sizing: border-box; }
     #board { width: 100%; max-width: 330px; margin: 10px auto; }
     .error-msg { color: #ff5630; font-size: 14px; margin-top: 5px; font-weight: bold; }
+    
+    /* Стили для всплывающего окна выбора соперника и вызовов */
+    .modal-list { background: #fff; border: 1px solid #ccc; padding: 10px; border-radius: 6px; margin-top: 10px; max-height: 150px; overflow-y: auto; }
+    .user-item { padding: 6px 10px; cursor: pointer; border-bottom: 1px solid #eee; }
+    .user-item:hover { background: #e2e8f0; }
+    #challenge-alert { background: #fff3cd; border: 1px solid #ffeeba; padding: 10px; border-radius: 6px; margin-bottom: 10px; text-align: center; }
   </style>
 </head>
 <body>
@@ -57,15 +63,9 @@
     <h3>Расписание уроков</h3>
     <ul>
       <li>15:00 — Индивидуальные и групповые занятия</li>
-      <li>17:00 — Разбор партий и задач</li>
+      <li>17:00 — Разбор партий</li>
     </ul>
     <button class="teacher-btn" onclick="startLessonByTeacher()">Начать урок</button>
-    
-    <div style="margin-top: 20px; border-top: 1px solid #ddd; padding-top: 10px;">
-      <h4>Управление учениками на уроке:</h4>
-      <button onclick="setMode('play')">Разрешить играть всем</button>
-      <button class="danger-btn" onclick="setMode('tasks')">Заставить решать задачи</button>
-    </div>
   </div>
 
   <!-- 4. КОМНАТА УРОКА -->
@@ -73,18 +73,30 @@
     <h3 style="margin-top:0;">Онлайн Урок в Эфире</h3>
     <div class="room-layout">
       
-      <!-- Видеосвязь (Прямая комната без модераторов и лишних окон) -->
+      <!-- Видеосвязь -->
       <div id="video-container">
         <iframe src="https://meet.jit.si/MrQafurChessMasterClass2026#config.startWithAudioMuted=false&config.startWithVideoMuted=false" allow="camera; microphone; fullscreen; display-capture" style="width:100%; height:100%; border:none;"></iframe>
       </div>
 
-      <!-- Шахматы справа -->
+      <!-- Шахматы и вызовы справа -->
       <div id="chess-sidebar">
-        <div id="mode-text" style="font-weight: bold; color: #0052cc; margin-bottom: 10px;">Режим: Свободная игра</div>
+        <!-- Уведомление о вызове (появляется у того, кому бросили вызов) -->
+        <div id="incoming-challenge" class="hidden">
+          <div id="challenge-alert">
+            <span id="challenger-text"></span>
+            <div style="margin-top: 8px;">
+              <button onclick="acceptChallenge()" style="background: #36b37e; padding: 5px 10px; font-size: 12px;">Принять</button>
+              <button onclick="rejectChallenge()" class="danger-btn" style="padding: 5px 10px; font-size: 12px;">Отклонить</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="mode-text" style="font-weight: bold; color: #0052cc; margin-bottom: 10px;">Партия в реальном времени</div>
         
         <div>
-          <button onclick="challenge()">Вызвать</button>
-          <button onclick="loadPuzzle()" style="background: #ffab00;">Задача</button>
+          <button onclick="openChallengeList()">Кинуть вызов</button>
+          <!-- Список участников для выбора -->
+          <div id="users-dropdown" class="modal-list hidden"></div>
         </div>
 
         <div id="board"></div>
@@ -105,7 +117,8 @@
     };
 
     let board = null;
-    let game = new Chess(); // Строгий шахматный движок с правилами
+    let game = new Chess();
+    let currentUserName = "";
 
     function handleLogin() {
       const loginInput = document.getElementById('username').value.trim();
@@ -119,6 +132,8 @@
         errorDiv.innerText = "Неверный логин или пароль!";
         return;
       }
+
+      currentUserName = user.name;
 
       if (user.type === "student") {
         document.getElementById('st-name').innerText = user.name;
@@ -152,34 +167,71 @@
           txt.style.color = "#36b37e"; 
         }
       }
+
+      // Проверка входящих вызовов для текущего пользователя через память браузера
+      const targetUser = localStorage.getItem('chess_challenge_target');
+      if (targetUser === currentUserName) {
+        const challenger = localStorage.getItem('chess_challenger_name');
+        document.getElementById('challenger-text').innerText = `Вам кинул вызов "${challenger}"`;
+        document.getElementById('incoming-challenge').classList.remove('hidden');
+      }
     }, 1500);
 
-    function setMode(mode) {
-      alert("Режим изменен: " + (mode === 'play' ? 'Свободная игра' : 'Только задачи'));
+    // Открыть список участников для вызова
+    function openChallengeList() {
+      const dropdown = document.getElementById('users-dropdown');
+      dropdown.innerHTML = "";
+      dropdown.classList.toggle('hidden');
+
+      // Собираем всех участников урока (ученики + учителя, кроме себя)
+      for (let key in usersDB) {
+        let u = usersDB[key];
+        if (u.name !== currentUserName) {
+          let item = document.createElement('div');
+          item.className = 'user-item';
+          item.innerText = u.name;
+          item.onclick = function() {
+            sendChallenge(u.name);
+            dropdown.classList.add('hidden');
+          };
+          dropdown.appendChild(item);
+        }
+      }
     }
 
-    // Функции проверки правил ходов
+    function sendChallenge(receiverName) {
+      localStorage.setItem('chess_challenger_name', currentUserName);
+      localStorage.setItem('chess_challenge_target', receiverName);
+      alert(`Вы отправили вызов игроку: ${receiverName}`);
+    }
+
+    function acceptChallenge() {
+      alert("Вы приняли вызов! Партия начинается.");
+      localStorage.removeItem('chess_challenge_target');
+      document.getElementById('incoming-challenge').classList.add('hidden');
+      game.reset();
+      board.position('start');
+    }
+
+    function rejectChallenge() {
+      alert("Вы отклонили вызов.");
+      localStorage.removeItem('chess_challenge_target');
+      document.getElementById('incoming-challenge').classList.add('hidden');
+    }
+
+    // Правила шахмат
     function onDragStart (source, piece, position, orientation) {
-      // Запрещаем ходить, если игра окончена
       if (game.game_over()) return false;
     }
 
     function onDrop (source, target) {
-      // Проверяем ход по правилам шахмат через chess.js
       var move = game.move({
         from: source,
         to: target,
-        promotion: 'q' // превращаем пешку в ферзя по умолчанию
+        promotion: 'q'
       });
 
-      // Если ход незаконный — возвращаем фигуру назад
       if (move === null) return 'snapback';
-
-      updateStatus();
-    }
-
-    function updateStatus() {
-      // Обновляем позицию на доске после правильного хода
       board.position(game.fen());
     }
 
@@ -200,17 +252,6 @@
           });
         }
       }, 300);
-    }
-
-    function challenge() {
-      alert("Вызов отправлен!");
-    }
-
-    function loadPuzzle() {
-      alert("Загружена шахматная задача!");
-      game.load('r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3');
-      board.position(game.fen());
-      document.getElementById('mode-text').innerText = "Режим: Решение задачи";
     }
   </script>
 </body>
