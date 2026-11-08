@@ -100,7 +100,7 @@
       
       <!-- Левый блок: Видео или Виртуальная доска учителя -->
       <div id="video-container">
-        <iframe id="video-iframe" src="https://meet.jit.si/MrQafurChessMasterClass2026#config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.p2p.enabled=true&interfaceConfigView.TOOLBAR_BUTTONS=['microphone','camera','fullscreen','chat','raise-hand']" allow="camera; microphone; fullscreen; display-capture" style="width:100%; height:100%; border:none;"></iframe>
+        <div id="video-wrapper" style="width:100%; height:100%;"></div>
         
         <div id="teacher-virtual-cam" class="hidden">
           <div style="color: #fff; font-weight: bold; margin-bottom: 8px; font-size: 14px;">Доска учителя (Трансляция вместо камеры)</div>
@@ -251,7 +251,6 @@
     let blackTime = 600;
     let timerInterval = null;
 
-    // Автоматическое восстановление только при простой перезагрузке (sessionStorage)
     window.onload = function() {
       const savedUserKey = sessionStorage.getItem('chess_current_user_key');
       const savedInRoom = sessionStorage.getItem('chess_in_room') === 'true';
@@ -295,7 +294,6 @@
       currentUserName = user.name;
       currentUserType = user.type;
 
-      // Используем sessionStorage: данные живут при обновлении страницы, но удаляются при закрытии вкладки/браузера
       sessionStorage.setItem('chess_current_user_key', loginInput);
 
       if (user.type === "student") {
@@ -377,11 +375,11 @@
       let teacherCamActiveState = localStorage.getItem('teacher_virtual_cam_active') === 'true';
 
       if (currentUserType === 'student') {
-        const videoIframe = document.getElementById('video-iframe');
+        const wrapper = document.getElementById('video-wrapper');
         const virtualCamDiv = document.getElementById('teacher-virtual-cam');
 
         if (teacherCamActiveState) {
-          videoIframe.classList.add('hidden');
+          wrapper.innerHTML = "";
           virtualCamDiv.classList.remove('hidden');
           if (teacherCamFen) {
             if (!window.studentVirtualBoard) {
@@ -394,8 +392,10 @@
             }
           }
         } else {
-          videoIframe.classList.remove('hidden');
           virtualCamDiv.classList.add('hidden');
+          if (!document.getElementById('jitsi-iframe')) {
+            loadJitsiVideo();
+          }
         }
       }
 
@@ -404,6 +404,22 @@
       }
     }, 1000);
 
+    // Функция плавной загрузки и автопереподключения Jitsi
+    function loadJitsiVideo() {
+      const wrapper = document.getElementById('video-wrapper');
+      wrapper.innerHTML = `<iframe id="jitsi-iframe" src="https://meet.jit.si/MrQafurChessMasterClass2026#config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.p2p.enabled=true&interfaceConfigView.TOOLBAR_BUTTONS=['microphone','camera','fullscreen','chat','raise-hand']" allow="camera; microphone; fullscreen; display-capture" style="width:100%; height:100%; border:none;"></iframe>`;
+    }
+
+    // Автоматический перезапуск Jitsi каждые 3.5 минуты (до срабатывания лимита), чтобы звонок никогда не обрывался посередине
+    setInterval(() => {
+      if (!document.getElementById('lesson-room').classList.contains('hidden') && !isVirtualCamActive) {
+        const iframe = document.getElementById('jitsi-iframe');
+        if (iframe) {
+          iframe.src = iframe.src; // Бесшовное обновление iframe в фоновом режиме
+        }
+      }
+    }, 210000); // 210 секунд = 3.5 минуты
+
     function openChallengeList() {
       const dropdown = document.getElementById('users-dropdown');
       dropdown.innerHTML = "";
@@ -411,7 +427,6 @@
 
       for (let key in usersDB) {
         let u = usersDB[key];
-        // Показываем всех остальных пользователей, кто сейчас онлайн
         if (u.name !== currentUserName && localStorage.getItem(`online_${u.name}`) === 'true') {
           let item = document.createElement('div');
           item.className = 'user-item';
@@ -605,6 +620,8 @@
       localStorage.setItem(`online_${currentUserName}`, 'true');
       sessionStorage.setItem('chess_in_room', 'true');
 
+      loadJitsiVideo();
+
       if (currentUserType === 'teacher') {
         document.getElementById('teacher-monitoring').classList.remove('hidden');
         document.getElementById('teacher-tools').classList.remove('hidden');
@@ -730,12 +747,11 @@
 
     function toggleVirtualCam() {
       isVirtualCamActive = !isVirtualCamActive;
-      const videoIframe = document.getElementById('video-iframe');
       const virtualCamDiv = document.getElementById('teacher-virtual-cam');
       const btn = document.getElementById('cam-toggle-btn');
 
       if (isVirtualCamActive) {
-        videoIframe.classList.add('hidden');
+        document.getElementById('video-wrapper').innerHTML = "";
         virtualCamDiv.classList.remove('hidden');
         btn.innerText = "Вернуть камеру (видеочат)";
         btn.style.background = "#ff5630";
@@ -743,8 +759,8 @@
         localStorage.setItem('teacher_virtual_cam_fen', game.fen());
         alert("Теперь вместо вашей камеры ученики видят вашу шахматную доску!");
       } else {
-        videoIframe.classList.remove('hidden');
         virtualCamDiv.classList.add('hidden');
+        loadJitsiVideo();
         btn.innerText = "Показать доску вместо камеры";
         btn.style.background = "#36b37e";
         localStorage.setItem('teacher_virtual_cam_active', 'false');
