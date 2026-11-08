@@ -74,6 +74,9 @@
     <hr>
     <p id="lesson-status" style="color: #ff5630; font-weight: bold;">Урок ещё не начат учителем...</p>
     <button id="join-btn" disabled onclick="enterRoom()">Подключиться к уроку</button>
+    <div style="margin-top: 15px;">
+      <button onclick="handleLogout()" style="background: #999; font-size: 11px;">Выйти из аккаунта</button>
+    </div>
   </div>
 
   <!-- 3. КАБИНЕТ УЧИТЕЛЯ -->
@@ -85,6 +88,9 @@
       <li>17:00 — Разбор партий</li>
     </ul>
     <button class="teacher-btn" onclick="startLessonByTeacher()">Начать урок</button>
+    <div style="margin-top: 15px;">
+      <button onclick="handleLogout()" style="background: #999; font-size: 11px;">Выйти из аккаунта</button>
+    </div>
   </div>
 
   <!-- 4. КОМНАТА УРОКА -->
@@ -94,7 +100,7 @@
       
       <!-- Левый блок: Видео или Виртуальная доска учителя -->
       <div id="video-container">
-        <iframe id="video-iframe" src="https://meet.jit.si/MrQafurChessMasterClass2026#config.startWithAudioMuted=false&config.startWithVideoMuted=false" allow="camera; microphone; fullscreen; display-capture" style="width:100%; height:100%; border:none;"></iframe>
+        <iframe id="video-iframe" src="https://meet.jit.si/MrQafurChessMasterClass2026#config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.p2p.enabled=true&interfaceConfigView.TOOLBAR_BUTTONS=['microphone','camera','fullscreen','chat','raise-hand']" allow="camera; microphone; fullscreen; display-capture" style="width:100%; height:100%; border:none;"></iframe>
         
         <div id="teacher-virtual-cam" class="hidden">
           <div style="color: #fff; font-weight: bold; margin-bottom: 8px; font-size: 14px;">Доска учителя (Трансляция вместо камеры)</div>
@@ -168,6 +174,10 @@
           <div class="mini-boards-container" id="mini-boards-grid"></div>
         </div>
 
+        <div style="margin-top: 15px; text-align: center;">
+          <button onclick="handleLogout()" style="background: #999; font-size: 11px;">Выйти из аккаунта</button>
+        </div>
+
       </div>
 
     </div>
@@ -222,8 +232,7 @@
       "professor-562": { type: "student", name: "Джавад Багырлы", pass: "023846", rating: 1400, teacher: "Гафур Мустафа" },
       "more788": { type: "student", name: "Дениз Новрузлу", pass: "040567", rating: 1250, teacher: "Гафур Мустафа" },
       "elsik437": { type: "student", name: "Эльсевер Гусейнов", pass: "487598", rating: 380, teacher: "Гафур Мустафа" },
-      "MrQafri-0620": { type: "teacher", name: "Гафур Мустафа", pass: "0620" },
-      "PatrickJane2": { type: "teacher", name: "Угур Иманлы", pass: "qoqoqo" }
+      "MrQafri-0620": { type: "teacher", name: "Гафур Мустафа", pass: "0620" }
     };
 
     let board = null;
@@ -242,6 +251,37 @@
     let blackTime = 600;
     let timerInterval = null;
 
+    // Автоматический вход при загрузке, если сессия сохранена
+    window.onload = function() {
+      const savedUserKey = localStorage.getItem('chess_current_user_key');
+      const savedInRoom = localStorage.getItem('chess_in_room') === 'true';
+
+      if (savedUserKey && usersDB[savedUserKey]) {
+        const user = usersDB[savedUserKey];
+        document.getElementById('username').value = savedUserKey;
+        document.getElementById('password').value = user.pass;
+        
+        currentUserName = user.name;
+        currentUserType = user.type;
+
+        if (savedInRoom) {
+          enterRoom();
+        } else {
+          if (user.type === "student") {
+            document.getElementById('st-name').innerText = user.name;
+            document.getElementById('st-rating').innerText = user.rating;
+            document.getElementById('st-teacher').innerText = user.teacher;
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('student-dash').classList.remove('hidden');
+          } else if (user.type === "teacher") {
+            document.getElementById('tr-name').innerText = user.name;
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('teacher-dash').classList.remove('hidden');
+          }
+        }
+      }
+    };
+
     function handleLogin() {
       const loginInput = document.getElementById('username').value.trim();
       const passInput = document.getElementById('password').value.trim();
@@ -257,6 +297,9 @@
 
       currentUserName = user.name;
       currentUserType = user.type;
+
+      // Сохраняем сессию в localStorage
+      localStorage.setItem('chess_current_user_key', loginInput);
 
       if (user.type === "student") {
         document.getElementById('st-name').innerText = user.name;
@@ -274,12 +317,20 @@
       }
     }
 
+    function handleLogout() {
+      localStorage.removeItem('chess_current_user_key');
+      localStorage.removeItem('chess_in_room');
+      localStorage.removeItem(`online_${currentUserName}`);
+      location.reload();
+    }
+
     function startLessonByTeacher() {
       localStorage.setItem('chess_lesson_active', 'true');
       alert("Урок начат!");
       enterRoom();
     }
 
+    // Автоматическое переподключение Jitsi при сбое связи
     setInterval(() => {
       if (localStorage.getItem('chess_lesson_active') === 'true') {
         const btn = document.getElementById('join-btn');
@@ -555,6 +606,7 @@
       document.getElementById('lesson-room').classList.remove('hidden');
 
       localStorage.setItem(`online_${currentUserName}`, 'true');
+      localStorage.setItem('chess_in_room', 'true');
 
       if (currentUserType === 'teacher') {
         document.getElementById('teacher-monitoring').classList.remove('hidden');
@@ -703,7 +755,6 @@
       }
     }
 
-    // Управление полноэкранным режимом доски
     function toggleFullscreenBoard() {
       isFullscreenOpen = !isFullscreenOpen;
       const overlay = document.getElementById('fullscreen-overlay');
@@ -736,7 +787,6 @@
       }
     }
 
-    // Перетаскивание фигур с панели расстановки
     function onShelfDrag(event, pieceCode) {
       event.dataTransfer.setData('text/plain', pieceCode);
     }
@@ -746,7 +796,6 @@
       document.body.addEventListener('drop', (e) => {
         const piece = e.dataTransfer.getData('text/plain');
         if (piece && isFullscreenOpen && currentUserType === 'teacher' && !activeGameId) {
-          // Если перетащили на доску
           const boardEl = document.getElementById('fullscreen-board');
           const rect = boardEl.getBoundingClientRect();
           if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
