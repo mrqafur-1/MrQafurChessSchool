@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Шахматная Школа</title>
 
-  <!-- jQuery, Chess.js и Chessboard.js -->
+  <!-- Подключаем стили и скрипты для шахмат (через надежный CDN) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
   <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
-  <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
 
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #ecefe6; margin: 0; padding: 20px; color: #333; }
@@ -29,10 +29,10 @@
 </head>
 <body>
 
-  <!-- 1. ЕДИНЫЙ ЭКРАН ВХОДА ДЛЯ ВСЕХ -->
+  <!-- 1. ЕДИНЫЙ ЭКРАН ВХОДА -->
   <div id="auth-screen" class="card">
     <h2>Вход в Шахматный Класс</h2>
-    <p style="color: #666; font-size: 14px;">Введите ваш персональный логин и пароль (ученик или учитель):</p>
+    <p style="color: #666; font-size: 14px;">Введите ваш персональный логин и пароль:</p>
     <input type="text" id="username" placeholder="Логин">
     <input type="password" id="password" placeholder="Пароль">
     <div id="login-error" class="error-msg"></div>
@@ -73,9 +73,9 @@
     <h3 style="margin-top:0;">Онлайн Урок в Эфире</h3>
     <div class="room-layout">
       
-      <!-- Видеосвязь -->
+      <!-- Видеосвязь (Используем стабильный аналог видеочата) -->
       <div id="video-container">
-        <iframe src="https://meet.jit.si/MrQafurChessLessonRoom101" allow="camera; microphone; fullscreen; display-capture" style="width:100%; height:100%; border:none;"></iframe>
+        <iframe src="https://meet.jit.si/MrQafurChessClassRoom2026" allow="camera; microphone; fullscreen; display-capture" style="width:100%; height:100%; border:none;"></iframe>
       </div>
 
       <!-- Шахматы справа -->
@@ -94,7 +94,6 @@
   </div>
 
   <script>
-    // База данных всех пользователей (ученики и учителя)
     const usersDB = {
       // Ученики
       "Murik-855": { type: "student", name: "Мурад Солтанов", pass: "865789", rating: 100, teacher: "Гафур Мустафа" },
@@ -117,7 +116,6 @@
       const errorDiv = document.getElementById('login-error');
 
       errorDiv.innerText = "";
-
       const user = usersDB[loginInput];
 
       if (!user || user.pass !== passInput) {
@@ -125,7 +123,6 @@
         return;
       }
 
-      // Открываем кабинет в зависимости от роли
       if (user.type === "student") {
         document.getElementById('st-name').innerText = user.name;
         document.getElementById('st-rating').innerText = user.rating;
@@ -144,11 +141,10 @@
 
     function startLessonByTeacher() {
       localStorage.setItem('chess_lesson_active', 'true');
-      alert("Урок начат! Кнопка у учеников стала активной.");
+      alert("Урок начат!");
       enterRoom();
     }
 
-    // Проверка статуса урока для учеников
     setInterval(() => {
       if (localStorage.getItem('chess_lesson_active') === 'true') {
         const btn = document.getElementById('join-btn');
@@ -162,7 +158,7 @@
     }, 1500);
 
     function setMode(mode) {
-      alert("Режим изменен для учеников: " + (mode === 'play' ? 'Свободная игра' : 'Только задачи'));
+      alert("Режим изменен: " + (mode === 'play' ? 'Свободная игра' : 'Только задачи'));
     }
 
     function enterRoom() {
@@ -174,9 +170,11 @@
       setTimeout(() => {
         if (!board) {
           game = new Chess();
+          // Указываем путь к картинкам фигур через CDN, чтобы они точно отображались
           board = Chessboard('board', {
             draggable: true,
-            position: 'start'
+            position: 'start',
+            pieceTheme: 'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/{piece}.png'
           });
         }
       }, 300);
