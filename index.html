@@ -137,7 +137,7 @@
           </div>
         </div>
 
-        <!-- Панель инструментов учителя (сброс, очистка, расстановка) -->
+        <!-- Панель инструментов учителя (сброс, очистка) -->
         <div id="teacher-tools" class="hidden" style="margin-bottom: 8px; background: #e2e8f0; padding: 8px; border-radius: 6px;">
           <div style="font-size: 11px; font-weight: bold; margin-bottom: 4px; color: #333;">Инструменты объяснения:</div>
           <button onclick="resetTeacherBoard()" style="background: #0052cc; font-size: 10px; padding: 4px 8px;">Начальная позиция</button>
@@ -163,12 +163,12 @@
   <script>
     const usersDB = {
       // Ученики
-      "Murik-855": { type: "student", name: "Мурад Солтанов", pass: "865789", rating: 1450, teacher: "Гафур Мустафа" },
-      "kenancik228": { type: "student", name: "Кянан Алиев", pass: "263573", rating: 1300, teacher: "Гафур Мустафа" },
-      "redjohn335": { type: "student", name: "Исмаилов Омяр", pass: "937637", rating: 1350, teacher: "Гафур Мустафа" },
-      "professor-562": { type: "student", name: "Джавад Багырлы", pass: "023846", rating: 1400, teacher: "Гафур Мустафа" },
-      "more788": { type: "student", name: "Дениз Новрузлу", pass: "040567", rating: 1250, teacher: "Гафур Мустафа" },
-      "elsever-001": { type: "student", name: "Эльсевер Гусейнов", pass: "202600", rating: 380, teacher: "Гафур Мустафа" },
+      "Murik-855": { type: "student", name: "Мурад Солтанов", pass: "865789", rating: 100, teacher: "Гафур Мустафа" },
+      "kenancik228": { type: "student", name: "Кянан Алиев", pass: "263573", rating: 100, teacher: "Гафур Мустафа" },
+      "redjohn335": { type: "student", name: "Исмаилов Омяр", pass: "937637", rating: 950, teacher: "Гафур Мустафа" },
+      "professor-562": { type: "student", name: "Джавад Багырлы", pass: "023846", rating: 150, teacher: "Гафур Мустафа" },
+      "more788": { type: "student", name: "Дениз Новрузлу", pass: "040567", rating: 450, teacher: "Гафур Мустафа" },
+      "elsik437": { type: "student", name: "Эльсевер Гусейнов", pass: "487598", rating: 380, teacher: "Гафур Мустафа" },
 
       // Учителя
       "MrQafri-0620": { type: "teacher", name: "Гафур Мустафа", pass: "0620" },
@@ -310,7 +310,6 @@
 
       for (let key in usersDB) {
         let u = usersDB[key];
-        // Учитель или ученик видит всех онлайн пользователей, кроме себя
         if (u.name !== currentUserName && localStorage.getItem(`online_${u.name}`) === 'true') {
           let item = document.createElement('div');
           item.className = 'user-item';
@@ -414,7 +413,6 @@
         return;
       }
 
-      // Если учитель на свободной доске — можно ставить и двигать любые фигуры (включая из панели dropOffBoard)
       if (currentUserType === 'teacher' && !activeGameId) {
         return true; 
       }
@@ -510,7 +508,7 @@
           board = Chessboard('board', {
             draggable: true,
             position: 'start',
-            dropOffBoard: 'trash', // Позволяет сбрасывать фигуры с доски при очистке
+            dropOffBoard: 'trash',
             onDragStart: onDragStart,
             onDrop: onDrop,
             pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
@@ -597,7 +595,6 @@
       alert("Открыта ваша личная свободная доска.");
     }
 
-    // Инструменты учителя для объяснения
     function resetTeacherBoard() {
       game.reset();
       board.position('start');
