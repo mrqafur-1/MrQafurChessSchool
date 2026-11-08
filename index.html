@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Шахматная Школа</title>
 
-  <!-- Подключаем стили и скрипты для шахмат (через надежный CDN) -->
+  <!-- jQuery, Chess.js и Chessboard.js -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
   <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
@@ -29,7 +29,7 @@
 </head>
 <body>
 
-  <!-- 1. ЕДИНЫЙ ЭКРАН ВХОДА -->
+  <!-- 1. ВХОД -->
   <div id="auth-screen" class="card">
     <h2>Вход в Шахматный Класс</h2>
     <p style="color: #666; font-size: 14px;">Введите ваш персональный логин и пароль:</p>
@@ -73,9 +73,9 @@
     <h3 style="margin-top:0;">Онлайн Урок в Эфире</h3>
     <div class="room-layout">
       
-      <!-- Видеосвязь (Используем стабильный аналог видеочата) -->
+      <!-- Видеосвязь (Прямая комната без модераторов и лишних окон) -->
       <div id="video-container">
-        <iframe src="https://meet.jit.si/MrQafurChessClassRoom2026" allow="camera; microphone; fullscreen; display-capture" style="width:100%; height:100%; border:none;"></iframe>
+        <iframe src="https://meet.jit.si/MrQafurChessMasterClass2026#config.startWithAudioMuted=false&config.startWithVideoMuted=false" allow="camera; microphone; fullscreen; display-capture" style="width:100%; height:100%; border:none;"></iframe>
       </div>
 
       <!-- Шахматы справа -->
@@ -83,7 +83,7 @@
         <div id="mode-text" style="font-weight: bold; color: #0052cc; margin-bottom: 10px;">Режим: Свободная игра</div>
         
         <div>
-          <button onclick="challenge()">Бросить вызов</button>
+          <button onclick="challenge()">Вызвать</button>
           <button onclick="loadPuzzle()" style="background: #ffab00;">Задача</button>
         </div>
 
@@ -95,20 +95,17 @@
 
   <script>
     const usersDB = {
-      // Ученики
       "Murik-855": { type: "student", name: "Мурад Солтанов", pass: "865789", rating: 100, teacher: "Гафур Мустафа" },
       "kenancik228": { type: "student", name: "Кянан Алиев", pass: "263573", rating: 100, teacher: "Гафур Мустафа" },
-      "redjohn335": { type: "student", name: "Исмаилов Омяр", pass: "937637", rating: 900, teacher: "Гафур Мустафа" },
+      "redjohn335": { type: "student", name: "Исмаилов Омяр", pass: "937637", rating: 950, teacher: "Гафур Мустафа" },
       "professor-562": { type: "student", name: "Джавад Багырлы", pass: "023846", rating: 150, teacher: "Гафур Мустафа" },
       "more788": { type: "student", name: "Дениз Новрузлу", pass: "040567", rating: 450, teacher: "Гафур Мустафа" },
-
-      // Учителя
       "MrQafri-0620": { type: "teacher", name: "Гафур Мустафа", pass: "0620" },
       "PatrickJane2": { type: "teacher", name: "Угур Иманлы", pass: "qoqoqo" }
     };
 
     let board = null;
-    let game = null;
+    let game = new Chess(); // Строгий шахматный движок с правилами
 
     function handleLogin() {
       const loginInput = document.getElementById('username').value.trim();
@@ -161,6 +158,31 @@
       alert("Режим изменен: " + (mode === 'play' ? 'Свободная игра' : 'Только задачи'));
     }
 
+    // Функции проверки правил ходов
+    function onDragStart (source, piece, position, orientation) {
+      // Запрещаем ходить, если игра окончена
+      if (game.game_over()) return false;
+    }
+
+    function onDrop (source, target) {
+      // Проверяем ход по правилам шахмат через chess.js
+      var move = game.move({
+        from: source,
+        to: target,
+        promotion: 'q' // превращаем пешку в ферзя по умолчанию
+      });
+
+      // Если ход незаконный — возвращаем фигуру назад
+      if (move === null) return 'snapback';
+
+      updateStatus();
+    }
+
+    function updateStatus() {
+      // Обновляем позицию на доске после правильного хода
+      board.position(game.fen());
+    }
+
     function enterRoom() {
       document.getElementById('auth-screen').classList.add('hidden');
       document.getElementById('student-dash').classList.add('hidden');
@@ -169,11 +191,11 @@
 
       setTimeout(() => {
         if (!board) {
-          game = new Chess();
-          // Указываем путь к картинкам фигур через CDN, чтобы они точно отображались
           board = Chessboard('board', {
             draggable: true,
             position: 'start',
+            onDragStart: onDragStart,
+            onDrop: onDrop,
             pieceTheme: 'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/{piece}.png'
           });
         }
@@ -186,11 +208,9 @@
 
     function loadPuzzle() {
       alert("Загружена шахматная задача!");
-      if (game && board) {
-        game.load('r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3');
-        board.position(game.fen());
-        document.getElementById('mode-text').innerText = "Режим: Решение задачи";
-      }
+      game.load('r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3');
+      board.position(game.fen());
+      document.getElementById('mode-text').innerText = "Режим: Решение задачи";
     }
   </script>
 </body>
