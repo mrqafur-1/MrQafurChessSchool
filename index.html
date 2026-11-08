@@ -40,7 +40,6 @@
     .mini-board { width: 100px; height: 100px; margin: 0 auto; }
     .mini-board-card span { font-size: 11px; font-weight: bold; display: block; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    /* Доска вместо видео слева */
     #teacher-virtual-cam { width: 100%; height: 100%; background: #27272a; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     #virtual-board { width: 360px; height: 360px; background: #fff; }
   </style>
@@ -89,7 +88,6 @@
       <div id="video-container">
         <iframe id="video-iframe" src="https://meet.jit.si/MrQafurChessMasterClass2026#config.startWithAudioMuted=false&config.startWithVideoMuted=false" allow="camera; microphone; fullscreen; display-capture" style="width:100%; height:100%; border:none;"></iframe>
         
-        <!-- Доска вместо камеры (скрыта по умолчанию) -->
         <div id="teacher-virtual-cam" class="hidden">
           <div style="color: #fff; font-weight: bold; margin-bottom: 8px; font-size: 14px;">Доска учителя (Трансляция вместо камеры)</div>
           <div id="virtual-board"></div>
@@ -139,6 +137,13 @@
           </div>
         </div>
 
+        <!-- Панель инструментов учителя (сброс, очистка, расстановка) -->
+        <div id="teacher-tools" class="hidden" style="margin-bottom: 8px; background: #e2e8f0; padding: 8px; border-radius: 6px;">
+          <div style="font-size: 11px; font-weight: bold; margin-bottom: 4px; color: #333;">Инструменты объяснения:</div>
+          <button onclick="resetTeacherBoard()" style="background: #0052cc; font-size: 10px; padding: 4px 8px;">Начальная позиция</button>
+          <button onclick="clearTeacherBoard()" style="background: #ff5630; font-size: 10px; padding: 4px 8px;">Очистить доску</button>
+        </div>
+
         <!-- Главная доска -->
         <div id="board"></div>
 
@@ -157,11 +162,15 @@
 
   <script>
     const usersDB = {
+      // Ученики
       "Murik-855": { type: "student", name: "Мурад Солтанов", pass: "865789", rating: 1450, teacher: "Гафур Мустафа" },
       "kenancik228": { type: "student", name: "Кянан Алиев", pass: "263573", rating: 1300, teacher: "Гафур Мустафа" },
       "redjohn335": { type: "student", name: "Исмаилов Омяр", pass: "937637", rating: 1350, teacher: "Гафур Мустафа" },
       "professor-562": { type: "student", name: "Джавад Багырлы", pass: "023846", rating: 1400, teacher: "Гафур Мустафа" },
       "more788": { type: "student", name: "Дениз Новрузлу", pass: "040567", rating: 1250, teacher: "Гафур Мустафа" },
+      "elsever-001": { type: "student", name: "Эльсевер Гусейнов", pass: "202600", rating: 380, teacher: "Гафур Мустафа" },
+
+      // Учителя
       "MrQafri-0620": { type: "teacher", name: "Гафур Мустафа", pass: "0620" },
       "PatrickJane2": { type: "teacher", name: "Угур Иманлы", pass: "qoqoqo" }
     };
@@ -218,7 +227,6 @@
       enterRoom();
     }
 
-    // Главный цикл синхронизации
     setInterval(() => {
       if (localStorage.getItem('chess_lesson_active') === 'true') {
         const btn = document.getElementById('join-btn');
@@ -264,7 +272,6 @@
         }
       }
 
-      // Синхронизация виртуальной доски учителя вместо камеры для учеников
       let teacherCamFen = localStorage.getItem('teacher_virtual_cam_fen');
       let teacherCamActiveState = localStorage.getItem('teacher_virtual_cam_active') === 'true';
 
@@ -303,6 +310,7 @@
 
       for (let key in usersDB) {
         let u = usersDB[key];
+        // Учитель или ученик видит всех онлайн пользователей, кроме себя
         if (u.name !== currentUserName && localStorage.getItem(`online_${u.name}`) === 'true') {
           let item = document.createElement('div');
           item.className = 'user-item';
@@ -319,7 +327,15 @@
     function sendChallenge(receiverName) {
       localStorage.setItem('chess_challenger_name', currentUserName);
       localStorage.setItem('chess_challenge_target', receiverName);
+      opponentName = receiverName;
+      activeGameId = [currentUserName, receiverName].sort().join('_vs_');
+      myAssignedColor = 'white';
+      
+      localStorage.removeItem(`match_resigned_${activeGameId}`);
       alert(`Вы отправили вызов игроку: ${receiverName}. Ожидаем подтверждения...`);
+      document.getElementById('color-info').innerText = `Ваш цвет: Белые ♔`;
+      document.getElementById('game-action-btns').classList.remove('hidden');
+      startNewGame('white');
     }
 
     function acceptChallenge() {
@@ -398,6 +414,7 @@
         return;
       }
 
+      // Если учитель на свободной доске — можно ставить и двигать любые фигуры (включая из панели dropOffBoard)
       if (currentUserType === 'teacher' && !activeGameId) {
         return true; 
       }
@@ -426,6 +443,9 @@
       }
       if (currentUserType === 'teacher' && isVirtualCamActive) {
         localStorage.setItem('teacher_virtual_cam_fen', game.fen());
+      }
+      if (currentUserType === 'teacher' && !activeGameId) {
+        localStorage.setItem('teacher_broadcast_fen', game.fen());
       }
     }
 
@@ -481,6 +501,7 @@
 
       if (currentUserType === 'teacher') {
         document.getElementById('teacher-monitoring').classList.remove('hidden');
+        document.getElementById('teacher-tools').classList.remove('hidden');
         document.getElementById('color-info').innerText = "Режим учителя: Свободная доска / Трансляции";
       }
 
@@ -489,6 +510,7 @@
           board = Chessboard('board', {
             draggable: true,
             position: 'start',
+            dropOffBoard: 'trash', // Позволяет сбрасывать фигуры с доски при очистке
             onDragStart: onDragStart,
             onDrop: onDrop,
             pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
@@ -498,6 +520,7 @@
           virtualBoard = Chessboard('virtual-board', {
             draggable: true,
             position: 'start',
+            dropOffBoard: 'trash',
             onDragStart: onDragStart,
             onDrop: onDrop,
             pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
@@ -505,21 +528,6 @@
         }
       }, 400);
     }
-
-    const originalSendChallenge = window.sendChallenge;
-    window.sendChallenge = function(receiverName) {
-      localStorage.setItem('chess_challenger_name', currentUserName);
-      localStorage.setItem('chess_challenge_target', receiverName);
-      opponentName = receiverName;
-      activeGameId = [currentUserName, receiverName].sort().join('_vs_');
-      myAssignedColor = 'white';
-      
-      localStorage.removeItem(`match_resigned_${activeGameId}`);
-      alert(`Вы отправили вызов игроку: ${receiverName}. Ожидаем подтверждения...`);
-      document.getElementById('color-info').innerText = `Ваш цвет: Белые ♔`;
-      document.getElementById('game-action-btns').classList.remove('hidden');
-      startNewGame('white');
-    };
 
     function updateTeacherMiniBoards() {
       const grid = document.getElementById('mini-boards-grid');
@@ -589,7 +597,28 @@
       alert("Открыта ваша личная свободная доска.");
     }
 
-    // Включение/выключение доски вместо камеры у учителя
+    // Инструменты учителя для объяснения
+    function resetTeacherBoard() {
+      game.reset();
+      board.position('start');
+      if (virtualBoard) virtualBoard.position('start');
+      if (isVirtualCamActive) localStorage.setItem('teacher_virtual_cam_fen', game.fen());
+      localStorage.setItem('teacher_broadcast_fen', game.fen());
+    }
+
+    function clearTeacherBoard() {
+      game.clear();
+      board.position('empty');
+      if (virtualBoard) virtualBoard.position('empty');
+      if (isVirtualCamActive) localStorage.setItem('teacher_virtual_cam_fen', game.fen());
+      localStorage.setItem('teacher_broadcast_fen', game.fen());
+    }
+
+    function broadcastTeacherBoard() {
+      localStorage.setItem('teacher_broadcast_fen', game.fen());
+      alert("Ваша доска транслируется всем ученикам!");
+    }
+
     function toggleVirtualCam() {
       isVirtualCamActive = !isVirtualCamActive;
       const videoIframe = document.getElementById('video-iframe');
