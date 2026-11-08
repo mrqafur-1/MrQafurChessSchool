@@ -251,16 +251,13 @@
     let blackTime = 600;
     let timerInterval = null;
 
-    // Автоматический вход при загрузке, если сессия сохранена
+    // Автоматическое восстановление только при простой перезагрузке (sessionStorage)
     window.onload = function() {
-      const savedUserKey = localStorage.getItem('chess_current_user_key');
-      const savedInRoom = localStorage.getItem('chess_in_room') === 'true';
+      const savedUserKey = sessionStorage.getItem('chess_current_user_key');
+      const savedInRoom = sessionStorage.getItem('chess_in_room') === 'true';
 
       if (savedUserKey && usersDB[savedUserKey]) {
         const user = usersDB[savedUserKey];
-        document.getElementById('username').value = savedUserKey;
-        document.getElementById('password').value = user.pass;
-        
         currentUserName = user.name;
         currentUserType = user.type;
 
@@ -298,8 +295,8 @@
       currentUserName = user.name;
       currentUserType = user.type;
 
-      // Сохраняем сессию в localStorage
-      localStorage.setItem('chess_current_user_key', loginInput);
+      // Используем sessionStorage: данные живут при обновлении страницы, но удаляются при закрытии вкладки/браузера
+      sessionStorage.setItem('chess_current_user_key', loginInput);
 
       if (user.type === "student") {
         document.getElementById('st-name').innerText = user.name;
@@ -318,8 +315,8 @@
     }
 
     function handleLogout() {
-      localStorage.removeItem('chess_current_user_key');
-      localStorage.removeItem('chess_in_room');
+      sessionStorage.removeItem('chess_current_user_key');
+      sessionStorage.removeItem('chess_in_room');
       localStorage.removeItem(`online_${currentUserName}`);
       location.reload();
     }
@@ -330,7 +327,6 @@
       enterRoom();
     }
 
-    // Автоматическое переподключение Jitsi при сбое связи
     setInterval(() => {
       if (localStorage.getItem('chess_lesson_active') === 'true') {
         const btn = document.getElementById('join-btn');
@@ -415,6 +411,7 @@
 
       for (let key in usersDB) {
         let u = usersDB[key];
+        // Показываем всех остальных пользователей, кто сейчас онлайн
         if (u.name !== currentUserName && localStorage.getItem(`online_${u.name}`) === 'true') {
           let item = document.createElement('div');
           item.className = 'user-item';
@@ -606,7 +603,7 @@
       document.getElementById('lesson-room').classList.remove('hidden');
 
       localStorage.setItem(`online_${currentUserName}`, 'true');
-      localStorage.setItem('chess_in_room', 'true');
+      sessionStorage.setItem('chess_in_room', 'true');
 
       if (currentUserType === 'teacher') {
         document.getElementById('teacher-monitoring').classList.remove('hidden');
