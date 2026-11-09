@@ -72,8 +72,8 @@
     <p>Оценка учителя (Рейтинг): <b><span id="st-rating"></span> ELO</b></p>
     <p>Ваш учитель: <b><span id="st-teacher"></span></b></p>
     <hr>
-    <p id="lesson-status" style="color: #ff5630; font-weight: bold;">Урок ещё не начат учителем...</p>
-    <button id="join-btn" disabled onclick="enterRoom()">Подключиться к уроку</button>
+    <p id="lesson-status" style="color: #36b37e; font-weight: bold;">Урок активен! Подключайтесь.</p>
+    <button id="join-btn" onclick="enterRoom()">Подключиться к уроку</button>
     <div style="margin-top: 15px;">
       <button onclick="handleLogout()" style="background: #999; font-size: 11px;">Выйти из аккаунта</button>
     </div>
@@ -87,7 +87,10 @@
       <li>15:00 — Индивидуальные и групповые занятия</li>
       <li>17:00 — Разбор партий</li>
     </ul>
-    <button class="teacher-btn" onclick="startLessonByTeacher()">Начать урок</button>
+    <button class="teacher-btn" onclick="startLessonByTeacher()">Начать урок / Войти в класс</button>
+    <div style="margin-top: 10px;">
+      <button onclick="forceRefreshLesson()" style="background: #ffab00; font-size: 11px;">🔄 Обновить статус урока для всех</button>
+    </div>
     <div style="margin-top: 15px;">
       <button onclick="handleLogout()" style="background: #999; font-size: 11px;">Выйти из аккаунта</button>
     </div>
@@ -226,11 +229,11 @@
 
   <script>
     const usersDB = {
-      "Murik-855": { type: "student", name: "Мурад Солтанов", pass: "865789", rating: 100, teacher: "Гафур Мустафа" },
-      "kenancik228": { type: "student", name: "Кянан Алиев", pass: "263573", rating: 100, teacher: "Гафур Мустафа" },
-      "redjohn335": { type: "student", name: "Исмаилов Омяр", pass: "937637", rating: 950, teacher: "Гафур Мустафа" },
-      "professor-562": { type: "student", name: "Джавад Багырлы", pass: "023846", rating: 100, teacher: "Гафур Мустафа" },
-      "more788": { type: "student", name: "Дениз Новрузлу", pass: "040567", rating: 450, teacher: "Гафур Мустафа" },
+      "Murik-855": { type: "student", name: "Мурад Солтанов", pass: "865789", rating: 1450, teacher: "Гафур Мустафа" },
+      "kenancik228": { type: "student", name: "Кянан Алиев", pass: "263573", rating: 1300, teacher: "Гафур Мустафа" },
+      "redjohn335": { type: "student", name: "Исмаилов Омяр", pass: "937637", rating: 1350, teacher: "Гафур Мустафа" },
+      "professor-562": { type: "student", name: "Джавад Багырлы", pass: "023846", rating: 1400, teacher: "Гафур Мустафа" },
+      "more788": { type: "student", name: "Дениз Новрузлу", pass: "040567", rating: 1250, teacher: "Гафур Мустафа" },
       "elsik437": { type: "student", name: "Эльсевер Гусейнов", pass: "487598", rating: 380, teacher: "Гафур Мустафа" },
       "MrQafri-0620": { type: "teacher", name: "Гафур Мустафа", pass: "0620" }
     };
@@ -325,27 +328,12 @@
       enterRoom();
     }
 
-    setInterval(() => {
-      // Проверка активности урока для учеников (каждые 0.5 сек для мгновенной реакции)
-      if (currentUserType === 'student') {
-        const lessonActive = localStorage.getItem('chess_lesson_active') === 'true';
-        const btn = document.getElementById('join-btn');
-        const txt = document.getElementById('lesson-status');
-        if (lessonActive) {
-          if (btn) btn.disabled = false;
-          if (txt) { 
-            txt.innerText = "Урок активен! Учитель ждет вас."; 
-            txt.style.color = "#36b37e"; 
-          }
-        } else {
-          if (btn) btn.disabled = true;
-          if (txt) {
-            txt.innerText = "Урок ещё не начат учителем...";
-            txt.style.color = "#ff5630";
-          }
-        }
-      }
+    function forceRefreshLesson() {
+      localStorage.setItem('chess_lesson_active', 'true');
+      alert("Статус обновлен! Теперь все ученики могут зайти.");
+    }
 
+    setInterval(() => {
       if (!document.getElementById('lesson-room').classList.contains('hidden')) {
         localStorage.setItem(`online_${currentUserName}`, 'true');
       }
@@ -743,7 +731,7 @@
       game.clear();
       if (board) board.position('empty');
       if (virtualBoard) virtualBoard.position('empty');
-      if (fullscreenBoard) fullscreenBoard.position('empty');
+      if (fullscreenBoard) virtualBoard.position('empty');
       if (isVirtualCamActive) localStorage.setItem('teacher_virtual_cam_fen', game.fen());
       localStorage.setItem('teacher_broadcast_fen', game.fen());
     }
