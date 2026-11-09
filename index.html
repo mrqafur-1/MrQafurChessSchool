@@ -226,11 +226,11 @@
 
   <script>
     const usersDB = {
-      "Murik-855": { type: "student", name: "Мурад Солтанов", pass: "865789", rating: 1450, teacher: "Гафур Мустафа" },
-      "kenancik228": { type: "student", name: "Кянан Алиев", pass: "263573", rating: 1300, teacher: "Гафур Мустафа" },
-      "redjohn335": { type: "student", name: "Исмаилов Омяр", pass: "937637", rating: 1350, teacher: "Гафур Мустафа" },
-      "professor-562": { type: "student", name: "Джавад Багырлы", pass: "023846", rating: 1400, teacher: "Гафур Мустафа" },
-      "more788": { type: "student", name: "Дениз Новрузлу", pass: "040567", rating: 1250, teacher: "Гафур Мустафа" },
+      "Murik-855": { type: "student", name: "Мурад Солтанов", pass: "865789", rating: 100, teacher: "Гафур Мустафа" },
+      "kenancik228": { type: "student", name: "Кянан Алиев", pass: "263573", rating: 100, teacher: "Гафур Мустафа" },
+      "redjohn335": { type: "student", name: "Исмаилов Омяр", pass: "937637", rating: 950, teacher: "Гафур Мустафа" },
+      "professor-562": { type: "student", name: "Джавад Багырлы", pass: "023846", rating: 100, teacher: "Гафур Мустафа" },
+      "more788": { type: "student", name: "Дениз Новрузлу", pass: "040567", rating: 450, teacher: "Гафур Мустафа" },
       "elsik437": { type: "student", name: "Эльсевер Гусейнов", pass: "487598", rating: 380, teacher: "Гафур Мустафа" },
       "MrQafri-0620": { type: "teacher", name: "Гафур Мустафа", pass: "0620" }
     };
@@ -326,13 +326,23 @@
     }
 
     setInterval(() => {
-      if (localStorage.getItem('chess_lesson_active') === 'true') {
+      // Проверка активности урока для учеников (каждые 0.5 сек для мгновенной реакции)
+      if (currentUserType === 'student') {
+        const lessonActive = localStorage.getItem('chess_lesson_active') === 'true';
         const btn = document.getElementById('join-btn');
         const txt = document.getElementById('lesson-status');
-        if (btn) btn.disabled = false;
-        if (txt) { 
-          txt.innerText = "Урок активен! Учитель ждет вас."; 
-          txt.style.color = "#36b37e"; 
+        if (lessonActive) {
+          if (btn) btn.disabled = false;
+          if (txt) { 
+            txt.innerText = "Урок активен! Учитель ждет вас."; 
+            txt.style.color = "#36b37e"; 
+          }
+        } else {
+          if (btn) btn.disabled = true;
+          if (txt) {
+            txt.innerText = "Урок ещё не начат учителем...";
+            txt.style.color = "#ff5630";
+          }
         }
       }
 
@@ -402,23 +412,21 @@
       if (currentUserType === 'teacher' && !document.getElementById('lesson-room').classList.contains('hidden')) {
         updateTeacherMiniBoards();
       }
-    }, 1000);
+    }, 500);
 
-    // Функция плавной загрузки и автопереподключения Jitsi
     function loadJitsiVideo() {
       const wrapper = document.getElementById('video-wrapper');
       wrapper.innerHTML = `<iframe id="jitsi-iframe" src="https://meet.jit.si/MrQafurChessMasterClass2026#config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.p2p.enabled=true&interfaceConfigView.TOOLBAR_BUTTONS=['microphone','camera','fullscreen','chat','raise-hand']" allow="camera; microphone; fullscreen; display-capture" style="width:100%; height:100%; border:none;"></iframe>`;
     }
 
-    // Автоматический перезапуск Jitsi каждые 3.5 минуты (до срабатывания лимита), чтобы звонок никогда не обрывался посередине
     setInterval(() => {
       if (!document.getElementById('lesson-room').classList.contains('hidden') && !isVirtualCamActive) {
         const iframe = document.getElementById('jitsi-iframe');
         if (iframe) {
-          iframe.src = iframe.src; // Бесшовное обновление iframe в фоновом режиме
+          iframe.src = iframe.src;
         }
       }
-    }, 210000); // 210 секунд = 3.5 минуты
+    }, 210000);
 
     function openChallengeList() {
       const dropdown = document.getElementById('users-dropdown');
