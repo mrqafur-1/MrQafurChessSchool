@@ -40,7 +40,7 @@
     .mini-board { width: 100px; height: 100px; margin: 0 auto; }
     .mini-board-card span { font-size: 11px; font-weight: bold; display: block; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    #teacher-virtual-cam { width: 100%; height: 100%; background: #27272a; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    #teacher-virtual-cam { width: 100%; height: 100%; background: #27272a; position: absolute; top: 0; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 5; }
     #virtual-board { width: 360px; height: 360px; background: #fff; }
 
     /* Полноэкранный режим доски */
@@ -88,9 +88,6 @@
       <li>17:00 — Разбор партий</li>
     </ul>
     <button class="teacher-btn" onclick="startLessonByTeacher()">Начать урок / Войти в класс</button>
-    <div style="margin-top: 10px;">
-      <button onclick="forceRefreshLesson()" style="background: #ffab00; font-size: 11px;">🔄 Обновить статус урока для всех</button>
-    </div>
     <div style="margin-top: 15px;">
       <button onclick="handleLogout()" style="background: #999; font-size: 11px;">Выйти из аккаунта</button>
     </div>
@@ -101,7 +98,7 @@
     <h3 style="margin-top:0;">Онлайн Урок в Эфире</h3>
     <div class="room-layout">
       
-      <!-- Левый блок: Видео или Виртуальная доска учителя -->
+      <!-- Левый блок: Видео и Виртуальная доска поверх (не сбрасывает звонок) -->
       <div id="video-container">
         <div id="video-wrapper" style="width:100%; height:100%;"></div>
         
@@ -318,26 +315,14 @@
     function handleLogout() {
       sessionStorage.removeItem('chess_current_user_key');
       sessionStorage.removeItem('chess_in_room');
-      localStorage.removeItem(`online_${currentUserName}`);
       location.reload();
     }
 
     function startLessonByTeacher() {
-      localStorage.setItem('chess_lesson_active', 'true');
-      alert("Урок начат!");
       enterRoom();
     }
 
-    function forceRefreshLesson() {
-      localStorage.setItem('chess_lesson_active', 'true');
-      alert("Статус обновлен! Теперь все ученики могут зайти.");
-    }
-
     setInterval(() => {
-      if (!document.getElementById('lesson-room').classList.contains('hidden')) {
-        localStorage.setItem(`online_${currentUserName}`, 'true');
-      }
-
       const targetUser = localStorage.getItem('chess_challenge_target');
       if (targetUser === currentUserName) {
         const challenger = localStorage.getItem('chess_challenger_name');
@@ -373,11 +358,9 @@
       let teacherCamActiveState = localStorage.getItem('teacher_virtual_cam_active') === 'true';
 
       if (currentUserType === 'student') {
-        const wrapper = document.getElementById('video-wrapper');
         const virtualCamDiv = document.getElementById('teacher-virtual-cam');
 
         if (teacherCamActiveState) {
-          wrapper.innerHTML = "";
           virtualCamDiv.classList.remove('hidden');
           if (teacherCamFen) {
             if (!window.studentVirtualBoard) {
@@ -391,9 +374,6 @@
           }
         } else {
           virtualCamDiv.classList.add('hidden');
-          if (!document.getElementById('jitsi-iframe')) {
-            loadJitsiVideo();
-          }
         }
       }
 
@@ -404,18 +384,12 @@
 
     function loadJitsiVideo() {
       const wrapper = document.getElementById('video-wrapper');
-      wrapper.innerHTML = `<iframe id="jitsi-iframe" src="https://meet.jit.si/MrQafurChessMasterClass2026#config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.p2p.enabled=true&interfaceConfigView.TOOLBAR_BUTTONS=['microphone','camera','fullscreen','chat','raise-hand']" allow="camera; microphone; fullscreen; display-capture" style="width:100%; height:100%; border:none;"></iframe>`;
+      if (!document.getElementById('jitsi-iframe')) {
+        wrapper.innerHTML = `<iframe id="jitsi-iframe" src="https://meet.jit.si/MrQafurChessMasterClass2026#config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.p2p.enabled=true&interfaceConfigView.TOOLBAR_BUTTONS=['microphone','camera','fullscreen','chat','raise-hand']" allow="camera; microphone; fullscreen; display-capture" style="width:100%; height:100%; border:none;"></iframe>`;
+      }
     }
 
-    setInterval(() => {
-      if (!document.getElementById('lesson-room').classList.contains('hidden') && !isVirtualCamActive) {
-        const iframe = document.getElementById('jitsi-iframe');
-        if (iframe) {
-          iframe.src = iframe.src;
-        }
-      }
-    }, 210000);
-
+    // Всегда показывать всех участников в вызовах (без проверки online)
     function openChallengeList() {
       const dropdown = document.getElementById('users-dropdown');
       dropdown.innerHTML = "";
@@ -423,7 +397,7 @@
 
       for (let key in usersDB) {
         let u = usersDB[key];
-        if (u.name !== currentUserName && localStorage.getItem(`online_${u.name}`) === 'true') {
+        if (u.name !== currentUserName) {
           let item = document.createElement('div');
           item.className = 'user-item';
           item.innerText = u.name;
@@ -613,7 +587,6 @@
       document.getElementById('teacher-dash').classList.add('hidden');
       document.getElementById('lesson-room').classList.remove('hidden');
 
-      localStorage.setItem(`online_${currentUserName}`, 'true');
       sessionStorage.setItem('chess_in_room', 'true');
 
       loadJitsiVideo();
@@ -731,7 +704,7 @@
       game.clear();
       if (board) board.position('empty');
       if (virtualBoard) virtualBoard.position('empty');
-      if (fullscreenBoard) virtualBoard.position('empty');
+      if (fullscreenBoard) fullscreenBoard.position('empty');
       if (isVirtualCamActive) localStorage.setItem('teacher_virtual_cam_fen', game.fen());
       localStorage.setItem('teacher_broadcast_fen', game.fen());
     }
@@ -747,7 +720,6 @@
       const btn = document.getElementById('cam-toggle-btn');
 
       if (isVirtualCamActive) {
-        document.getElementById('video-wrapper').innerHTML = "";
         virtualCamDiv.classList.remove('hidden');
         btn.innerText = "Вернуть камеру (видеочат)";
         btn.style.background = "#ff5630";
@@ -756,7 +728,6 @@
         alert("Теперь вместо вашей камеры ученики видят вашу шахматную доску!");
       } else {
         virtualCamDiv.classList.add('hidden');
-        loadJitsiVideo();
         btn.innerText = "Показать доску вместо камеры";
         btn.style.background = "#36b37e";
         localStorage.setItem('teacher_virtual_cam_active', 'false');
