@@ -75,7 +75,7 @@ const $=id=>document.getElementById(id),G=k=>{try{return JSON.parse(localStorage
 esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let me,game=new Chess(),board,fsb,vcam,mode='free',mid=null,viewFen=START,freeFen=START,camOn=false,loose=false,minis={},seenChal=0,seenRes=0,done={},ownId=null,busy=0,curView='cab',jLoaded=false,curChal=null;
 const T=()=>me.role==='t',user=id=>ALL.find(u=>u.id===id),nm=id=>user(id).name,STU=()=>ALL.filter(u=>u.role==='s'),
-cls=()=>G('cls')||{r:{},n:{},g:{}},rate=u=>cls().r[u.id]??u.rating,lessonOn=()=>{const l=G('lesson');return !!(l&&l.active)};
+cls=()=>G('cls')||{r:{},n:{},g:{},s:{}},susp=id=>!!((cls().s||{})[id]),rate=u=>cls().r[u.id]??u.rating,lessonOn=()=>{const l=G('lesson');return !!(l&&l.active)};
 function toast(t){const e=$('toast');e.textContent=t;e.classList.remove('hide');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.add('hide'),3000)}
 function note(h){const n=$('notice');n.innerHTML=h+'<div class="row"><button onclick="$(\'notice\').classList.add(\'hide\')">OK</button></div>';n.classList.remove('hide')}
 
@@ -85,21 +85,25 @@ function login(){const u=ALL.find(x=>x.id===$('lg').value.trim()&&x.pass===$('ps
 function logout(){sessionStorage.clear();location.reload()}
 function start(u){me=u;$('cabName').textContent=u.name+(T()?' (учитель)':'');if(T())S('teacher_virtual_cam_fen',{on:false});
  go(sessionStorage.getItem('v')==='room'&&lessonOn()?'room':'cab');setInterval(tick,500);window.addEventListener('storage',tick)}
-function go(v){curView=v;sessionStorage.setItem('v',v);$('login').classList.add('hide');['cab','room'].forEach(x=>$(x).classList.toggle('hide',x!==v));v==='room'?initRoom():renderCab()}
+function kick(){jLoaded=false;$('jf').src='about:blank'}
+function go(v){if(v==='room'&&!T()&&susp(me.id)){toast('Вы отстранены от урока');v='cab'}
+ curView=v;sessionStorage.setItem('v',v);$('login').classList.add('hide');['cab','room'].forEach(x=>$(x).classList.toggle('hide',x!==v));v==='room'?initRoom():renderCab()}
 
 /* ---------- кабинет ---------- */
 function lessonHtml(){const on=lessonOn();
  if(T())return on?'<div class="ok">🟢 Урок идёт</div><button class="g" onclick="go(\'room\')">Войти в урок</button><button class="red" onclick="endL()">Завершить урок</button>':'<div>⚪ Урок не начат</div><button class="g" onclick="startL()">Начать урок</button>';
+ if(susp(me.id))return '<div style="color:#c44b3b;font-weight:600">⛔ Вы отстранены от урока учителем</div><button disabled>Присоединиться</button>';
  return on?'<div class="ok">🟢 Урок начат</div><button class="g" onclick="go(\'room\')">Присоединиться</button>':'<div>⚪ Учитель ещё не начал урок</div><button disabled>Присоединиться</button>'}
 function startL(){S('lesson',{active:true,ts:Date.now()});S('teacher_virtual_cam_fen',{on:false});go('room')}
 function endL(){if(!confirm('Завершить урок для всех?'))return;S('lesson',{active:false});camSet(false);go('cab')}
 function stuBody(){const n=(cls().n[me.id]||[]).slice().reverse();
  return '<div class="card"><h3>Мой рейтинг: '+rate(me)+'</h3></div><div class="card"><h3>Замечания учителя</h3>'+(n.length?n.map(x=>'<div class="hl"><small>'+new Date(x.t).toLocaleString()+'</small><br>'+esc(x.x)+'</div>').join(''):'Замечаний нет')+'</div>'}
 function teacherBody(){const c=cls();return Object.keys(GR).map(g=>{const l=STU().map((u,i)=>[u,i]).filter(([u])=>(c.g[u.id]||'weak')===g);
- return '<div class="card"><h3>Группа «'+GR[g]+'» ('+l.length+')</h3>'+l.map(([u,i])=>'<div class="st"><b>'+u.name+'</b> <small>'+u.id+'</small><div>Рейтинг: <input type="number" id="r'+i+'" value="'+rate(u)+'"><button onclick="setR('+i+')">Сохранить</button></div>'+
+ return '<div class="card"><h3>Группа «'+GR[g]+'» ('+l.length+')</h3>'+l.map(([u,i])=>'<div class="st"><button class="'+(susp(u.id)?'g':'red')+'" onclick="toggleS('+i+')">'+(susp(u.id)?'Вернуть':'Отстранить')+'</button> <b>'+u.name+(susp(u.id)?' ⛔':'')+'</b> <small>'+u.id+'</small><div>Рейтинг: <input type="number" id="r'+i+'" value="'+rate(u)+'"><button onclick="setR('+i+')">Сохранить</button></div>'+
  ((c.n[u.id]||[]).map((x,k)=>'<div class="hl">'+esc(x.x)+' <button class="gray" onclick="delN('+i+','+k+')">×</button></div>').join(''))+
  '<textarea id="n'+i+'" placeholder="Замечание ученику"></textarea><button class="g" onclick="addN('+i+')">Отправить замечание</button></div>').join('')+'</div>'}).join('')}
 function renderCab(){const h=T()?teacherBody():stuBody();$('cabBody').innerHTML=h;$('cabBody').dataset.h=h;$('lessonBox').dataset.h='';tick()}
+function toggleS(i){const c=cls(),id=STU()[i].id;c.s=c.s||{};if(c.s[id])delete c.s[id];else c.s[id]=1;S('cls',c);renderCab()}
 function setR(i){const v=parseInt($('r'+i).value);if(isNaN(v))return;const c=cls();c.r[STU()[i].id]=v;S('cls',c);toast('Рейтинг сохранён')}
 function addN(i){const t=$('n'+i).value.trim();if(!t)return;const c=cls(),id=STU()[i].id;(c.n[id]=c.n[id]||[]).push({t:Date.now(),x:t});S('cls',c);renderCab()}
 function delN(i,k){const c=cls();c.n[STU()[i].id].splice(k,1);S('cls',c);renderCab()}
@@ -209,6 +213,7 @@ function closeFs(){fsb&&fsb.destroy();fsb=null;$('fs').classList.add('hide')}
 function tick(){if(!me)return;
  const lb=lessonHtml(),box=$('lessonBox');if(box.dataset.h!==lb){box.dataset.h=lb;box.innerHTML=lb}
  if(!T()&&curView==='cab'){const b=stuBody(),cb=$('cabBody');if(cb.dataset.h!==b){cb.dataset.h=b;cb.innerHTML=b}}
+ if(curView==='room'&&!T()&&susp(me.id)){kick();note('⛔ Учитель отстранил вас от урока');go('cab');return}
  if(curView==='room'&&!T()&&!lessonOn()){note('Урок завершён учителем');go('cab')}
  chals();if(board||curView==='room')matches();
  if(curView==='room'&&board){refresh();camUpd();if(T()){minisUpd();histUpd()}}}
