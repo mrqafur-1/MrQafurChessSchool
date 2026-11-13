@@ -49,10 +49,11 @@ input,textarea{font:inherit;padding:8px;border:1px solid #ccc;border-radius:10px
 <div id="minis"></div><div id="noMini">Сейчас никто не играет</div><div id="hist" class="hide"></div></div>
 </div>
 <div class="card"><div id="stat"></div><div class="clk" id="ct"></div><div id="bd"></div><div class="clk" id="cb"></div>
-<div class="row"><button id="bFlip" class="hide" onclick="flipB()">🔄 Перевернуть доску</button><button id="bBack" class="gray hide" onclick="back()">← К моей доске</button><button onclick="openFs()">🔲 Развернуть доску (на полэкрана)</button>
+<div class="row"><button id="bFlip" class="g hide" onclick="flipB()" style="width:100%;max-width:440px;font-size:16px">🔄 Перевернуть доску</button></div>
+<div class="row"><button id="bBack" class="gray hide" onclick="back()">← К моей доске</button><button onclick="openFs()">🔲 Развернуть доску (на полэкрана)</button>
 <button id="bR" class="red hide" onclick="resign()">Сдаться</button><button id="bD" class="hide" onclick="offerDraw()">Ничья</button></div></div></div></div>
 
-<div id="fs" class="modal hide"><div class="card"><div id="fsb"></div><div class="row"><span id="fsTools"><button class="g" onclick="pos0()">Начальная позиция</button><button class="red" onclick="clr()">Очистить</button></span><button class="gray" onclick="closeFs()">Закрыть</button></div></div></div>
+<div id="fs" class="modal hide"><div class="card"><div id="fsb"></div><div class="row"><span id="fsTools"><button class="g" onclick="pos0()">Начальная позиция</button><button class="red" onclick="clr()">Очистить</button></span><button id="bFlip2" class="hide" onclick="flipB()">🔄 Перевернуть</button><button class="gray" onclick="closeFs()">Закрыть</button></div></div></div>
 <div id="pick" class="modal hide"><div class="card"><h3>Кому бросить вызов?</h3><div id="pl"></div><button class="gray" onclick="$('pick').classList.add('hide')">Отмена</button></div></div>
 <div id="notice" class="hide"></div><div id="toast" class="hide"></div>
 
@@ -198,7 +199,7 @@ function matches(){const m=myMatch();if(!m)return;
   if(mode==='match'){mode='free';mid=null;board&&board.orientation('white')}ownId=null;refresh()}}
 
 /* ---------- полный экран ---------- */
-function openFs(){$('fs').classList.remove('hide');const sp=T()&&mode==='free';$('fsTools').classList.toggle('hide',!sp);
+function openFs(){$('fs').classList.remove('hide');$('bFlip2').classList.toggle('hide',!T());const sp=T()&&mode==='free';$('fsTools').classList.toggle('hide',!sp);
  fsb=Chessboard('fsb',sp?{position:freeFen,pieceTheme:theme,draggable:true,sparePieces:true,dropOffBoard:'trash',
   onChange:(o,n)=>{const f=Chessboard.objToFen(n);if(f!==freeFen.split(' ')[0]){freeFen=f+' w - - 0 1';refresh()}}}
   :{position:curFen(),pieceTheme:theme,draggable:mode!=='view',onDragStart:ds,onDrop:dr,onSnapEnd:se});fsb.orientation(board.orientation())}
