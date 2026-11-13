@@ -1,806 +1,210 @@
 <!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Шахматная Школа</title>
-
-  <!-- Загрузка библиотек шахмат -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
-  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
-
-  <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #ecefe6; margin: 0; padding: 20px; color: #333; }
-    .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 1100px; margin: 0 auto 20px auto; }
-    .hidden { display: none !important; }
-    input { padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; width: 220px; display: block; }
-    button { padding: 8px 14px; border: none; border-radius: 6px; background: #36b37e; color: white; font-weight: bold; cursor: pointer; margin-right: 6px; margin-top: 5px; }
-    button:disabled { background: #ccc; cursor: not-allowed; }
-    button.teacher-btn { background: #0052cc; }
-    button.danger-btn { background: #ff5630; }
-    .room-layout { display: flex; gap: 20px; flex-wrap: wrap; justify-content: space-between; }
-    
-    #video-container { flex: 1; min-width: 350px; height: 500px; background: #000; border-radius: 8px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; }
-    #video-wrapper { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
-    
-    #chess-sidebar { width: 420px; background: #f4f5f7; padding: 15px; border-radius: 8px; box-sizing: border-box; max-height: 550px; overflow-y: auto; }
-    #board { width: 100%; max-width: 320px; margin: 10px auto; }
-    .error-msg { color: #ff5630; font-size: 14px; margin-top: 5px; font-weight: bold; }
-    
-    .modal-list { background: #fff; border: 1px solid #ccc; padding: 10px; border-radius: 6px; margin-top: 10px; max-height: 150px; overflow-y: auto; }
-    .user-item { padding: 6px 10px; cursor: pointer; border-bottom: 1px solid #eee; }
-    .user-item:hover { background: #e2e8f0; }
-    .alert-box { background: #fff3cd; border: 1px solid #ffeeba; padding: 10px; border-radius: 6px; margin-bottom: 10px; text-align: center; }
-
-    .timer-box { display: flex; justify-content: space-between; background: #222; color: #00ff66; font-family: monospace; font-size: 18px; padding: 6px 12px; border-radius: 6px; margin-bottom: 8px; }
-
-    .mini-boards-container { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-    .mini-board-card { background: #fff; padding: 8px; border-radius: 6px; border: 1px solid #ccc; width: 120px; text-align: center; }
-    .mini-board { width: 100px; height: 100px; margin: 0 auto; }
-    .mini-board-card span { font-size: 11px; font-weight: bold; display: block; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-    #teacher-virtual-cam { width: 100%; height: 100%; background: #27272a; position: absolute; top: 0; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
-    #virtual-board { width: 360px; height: 360px; background: #fff; }
-
-    /* Полноэкранный режим доски */
-    #fullscreen-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center; }
-    .fullscreen-content { background: #fff; padding: 25px; border-radius: 12px; display: flex; gap: 20px; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-    #fullscreen-board { width: 450px; height: 450px; }
-    .piece-shelf { display: flex; flex-direction: column; gap: 6px; background: #f4f5f7; padding: 10px; border-radius: 6px; border: 1px solid #ccc; }
-    .shelf-row { display: flex; gap: 4px; justify-content: center; }
-    .shelf-piece { width: 35px; height: 35px; cursor: grab; background-size: cover; }
-  </style>
-</head>
-<body>
-
-  <!-- 1. ВХОД -->
-  <div id="auth-screen" class="card">
-    <h2>Вход в Шахматный Класс</h2>
-    <p style="color: #666; font-size: 14px;">Введите ваш персональный логин и пароль:</p>
-    <input type="text" id="username" placeholder="Логин">
-    <input type="password" id="password" placeholder="Пароль">
-    <div id="login-error" class="error-msg"></div>
-    <div style="margin-top: 15px;">
-      <button onclick="handleLogin()">Войти в систему</button>
-    </div>
-  </div>
-
-  <!-- 2. ПРОФИЛЬ УЧЕНИКА -->
-  <div id="student-dash" class="card hidden">
-    <h2>Профиль ученика: <span id="st-name"></span></h2>
-    <p>Оценка учителя (Рейтинг): <b><span id="st-rating"></span> ELO</b></p>
-    <p>Ваш учитель: <b><span id="st-teacher"></span></b></p>
-    <hr>
-    <p id="lesson-status" style="color: #36b37e; font-weight: bold;">Урок активен! Подключайтесь.</p>
-    <button id="join-btn" onclick="enterRoom()">Подключиться к уроку</button>
-    <div style="margin-top: 15px;">
-      <button onclick="handleLogout()" style="background: #999; font-size: 11px;">Выйти из аккаунта</button>
-    </div>
-  </div>
-
-  <!-- 3. КАБИНЕТ УЧИТЕЛЯ -->
-  <div id="teacher-dash" class="card hidden">
-    <h2>Кабинет учителя: <span id="tr-name"></span></h2>
-    <h3>Расписание уроков</h3>
-    <ul>
-      <li>15:00 — Индивидуальные и групповые занятия</li>
-      <li>17:00 — Разбор партий</li>
-    </ul>
-    <button class="teacher-btn" onclick="startLessonByTeacher()">Начать урок / Войти в класс</button>
-    <div style="margin-top: 15px;">
-      <button onclick="handleLogout()" style="background: #999; font-size: 11px;">Выйти из аккаунта</button>
-    </div>
-  </div>
-
-  <!-- 4. КОМНАТА УРОКА -->
-  <div id="lesson-room" class="card hidden">
-    <h3 style="margin-top:0;">Онлайн Урок в Эфире</h3>
-    <div class="room-layout">
-      
-      <!-- Левый блок: Видео и Виртуальная доска учителя -->
-      <div id="video-container">
-        <div id="video-wrapper"></div>
-        
-        <div id="teacher-virtual-cam" class="hidden">
-          <div style="color: #fff; font-weight: bold; margin-bottom: 8px; font-size: 14px;">Доска учителя (Трансляция вместо камеры)</div>
-          <div id="virtual-board"></div>
-        </div>
-      </div>
-
-      <!-- Шахматы справа -->
-      <div id="chess-sidebar">
-        <!-- Уведомление о вызове -->
-        <div id="incoming-challenge" class="hidden">
-          <div class="alert-box">
-            <span id="challenger-text"></span>
-            <div style="margin-top: 8px;">
-              <button onclick="acceptChallenge()" style="background: #36b37e; padding: 5px 10px; font-size: 12px;">Принять</button>
-              <button onclick="rejectChallenge()" class="danger-btn" style="padding: 5px 10px; font-size: 12px;">Отклонить</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Уведомление о ничьей -->
-        <div id="incoming-draw" class="hidden">
-          <div class="alert-box">
-            <span>Соперник предлагает ничью</span>
-            <div style="margin-top: 8px;">
-              <button onclick="acceptDraw()" style="background: #36b37e; padding: 5px 10px; font-size: 12px;">Согласиться</button>
-              <button onclick="rejectDraw()" class="danger-btn" style="padding: 5px 10px; font-size: 12px;">Отказать</button>
-            </div>
-          </div>
-        </div>
-
-        <div id="mode-text" style="font-weight: bold; color: #0052cc; margin-bottom: 5px;">Партия (Контроль 10+5)</div>
-        <div id="color-info" style="font-size: 13px; font-weight: bold; margin-bottom: 8px;"></div>
-
-        <!-- Часы -->
-        <div class="timer-box">
-          <div>Черные: <span id="black-timer">10:00</span></div>
-          <div>Белые: <span id="white-timer">10:00</span></div>
-        </div>
-        
-        <div id="user-controls">
-          <button onclick="openChallengeList()">Кинуть вызов</button>
-          <div id="users-dropdown" class="modal-list hidden"></div>
-          
-          <div id="game-action-btns" class="hidden" style="margin-top: 8px;">
-            <button class="danger-btn" onclick="resignGame()" style="font-size: 12px; padding: 6px 10px;">Сдаться</button>
-            <button onclick="offerDraw()" style="background: #ffab00; font-size: 12px; padding: 6px 10px;">Ничья</button>
-          </div>
-        </div>
-
-        <!-- Панель инструментов учителя (сброс, очистка) -->
-        <div id="teacher-tools" class="hidden" style="margin-bottom: 8px; background: #e2e8f0; padding: 8px; border-radius: 6px;">
-          <div style="font-size: 11px; font-weight: bold; margin-bottom: 4px; color: #333;">Инструменты объяснения:</div>
-          <button onclick="resetTeacherBoard()" style="background: #0052cc; font-size: 10px; padding: 4px 8px;">Начальная позиция</button>
-          <button onclick="clearTeacherBoard()" style="background: #ff5630; font-size: 10px; padding: 4px 8px;">Очистить доску</button>
-        </div>
-
-        <!-- Главная доска -->
-        <div id="board"></div>
-
-        <!-- Кнопка полноэкранного режима доски -->
-        <div style="text-align: center; margin-top: 6px;">
-          <button onclick="toggleFullscreenBoard()" style="background: #595959; font-size: 11px; padding: 5px 10px; width: 100%;">🔲 Развернуть доску (на полэкрана)</button>
-        </div>
-
-        <!-- Блок трансляций для учителя -->
-        <div id="teacher-monitoring" class="hidden" style="margin-top: 15px; border-top: 2px solid #ccc; padding-top: 10px;">
-          <h4 style="margin: 0 0 8px 0; font-size: 14px; color: #0052cc;">Панель учителя:</h4>
-          <button onclick="showTeacherBoard()" style="background: #0052cc; font-size: 11px; padding: 5px 10px; margin-bottom: 6px;">Моя доска</button>
-          <button onclick="toggleVirtualCam()" id="cam-toggle-btn" style="background: #36b37e; font-size: 11px; padding: 5px 10px; margin-bottom: 6px;">Показать доску вместо камеры</button>
-          <div class="mini-boards-container" id="mini-boards-grid"></div>
-        </div>
-
-        <div style="margin-top: 15px; text-align: center;">
-          <button onclick="handleLogout()" style="background: #999; font-size: 11px;">Выйти из аккаунта</button>
-        </div>
-
-      </div>
-
-    </div>
-  </div>
-
-  <!-- Оверлей полноэкранной доски -->
-  <div id="fullscreen-overlay" class="hidden">
-    <div class="fullscreen-content">
-      <div>
-        <h3 style="margin-top:0; color:#0052cc;">Полноэкранный режим доски</h3>
-        <div id="fullscreen-board"></div>
-        <div style="margin-top: 10px; text-align: center;">
-          <button onclick="toggleFullscreenBoard()" style="background: #36b37e;">Закрыть полноэкранный режим</button>
-        </div>
-      </div>
-      <!-- Панель инструментов в полноэкранном режиме (только если учитель не в партии) -->
-      <div id="fullscreen-teacher-panel" class="hidden piece-shelf">
-        <div style="font-size: 12px; font-weight: bold; text-align:center;">Инструменты</div>
-        <button onclick="resetTeacherBoard()" style="background: #0052cc; font-size: 10px; padding: 4px;">Начальная позиция</button>
-        <button onclick="clearTeacherBoard()" style="background: #ff5630; font-size: 10px; padding: 4px;">Очистить доску</button>
-        <div style="font-size: 11px; font-weight: bold; margin-top:5px; text-align:center;">Фигуры</div>
-        <div class="shelf-row">
-          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/wK.png')" draggable="true" ondragstart="onShelfDrag(event, 'wK')"></div>
-          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/wQ.png')" draggable="true" ondragstart="onShelfDrag(event, 'wQ')"></div>
-          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/wR.png')" draggable="true" ondragstart="onShelfDrag(event, 'wR')"></div>
-        </div>
-        <div class="shelf-row">
-          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/wB.png')" draggable="true" ondragstart="onShelfDrag(event, 'wB')"></div>
-          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/wN.png')" draggable="true" ondragstart="onShelfDrag(event, 'wN')"></div>
-          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/wP.png')" draggable="true" ondragstart="onShelfDrag(event, 'wP')"></div>
-        </div>
-        <hr style="width:100%; margin:4px 0;">
-        <div class="shelf-row">
-          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/bK.png')" draggable="true" ondragstart="onShelfDrag(event, 'bK')"></div>
-          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/bQ.png')" draggable="true" ondragstart="onShelfDrag(event, 'bQ')"></div>
-          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/bR.png')" draggable="true" ondragstart="onShelfDrag(event, 'bR')"></div>
-        </div>
-        <div class="shelf-row">
-          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/bB.png')" draggable="true" ondragstart="onShelfDrag(event, 'bB')"></div>
-          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/bN.png')" draggable="true" ondragstart="onShelfDrag(event, 'bN')"></div>
-          <div class="shelf-piece" style="background-image:url('https://chessboardjs.com/img/chesspieces/wikipedia/bP.png')" draggable="true" ondragstart="onShelfDrag(event, 'bP')"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    const usersDB = {
-      "Murik-855": { type: "student", name: "Мурад Солтанов", pass: "865789", rating: 1450, teacher: "Гафур Мустафа" },
-      "kenancik228": { type: "student", name: "Кянан Алиев", pass: "263573", rating: 1300, teacher: "Гафур Мустафа" },
-      "redjohn335": { type: "student", name: "Исмаилов Омяр", pass: "937637", rating: 1350, teacher: "Гафур Мустафа" },
-      "professor-562": { type: "student", name: "Джавад Багырлы", pass: "023846", rating: 1400, teacher: "Гафур Мустафа" },
-      "more788": { type: "student", name: "Дениз Новрузлу", pass: "040567", rating: 1250, teacher: "Гафур Мустафа" },
-      "elsik437": { type: "student", name: "Эльсевер Гусейнов", pass: "487598", rating: 380, teacher: "Гафур Мустафа" },
-      "MrQafri-0620": { type: "teacher", name: "Гафур Мустафа", pass: "0620" }
-    };
-
-    let board = null;
-    let virtualBoard = null;
-    let fullscreenBoard = null;
-    let game = new Chess();
-    let currentUserName = "";
-    let currentUserType = "";
-    let myAssignedColor = null; 
-    let activeGameId = null;
-    let opponentName = null;
-    let isVirtualCamActive = false;
-    let isFullscreenOpen = false;
-
-    let whiteTime = 600;
-    let blackTime = 600;
-    let timerInterval = null;
-
-    window.onload = function() {
-      const savedUserKey = sessionStorage.getItem('chess_current_user_key');
-      const savedInRoom = sessionStorage.getItem('chess_in_room') === 'true';
-
-      if (savedUserKey && usersDB[savedUserKey]) {
-        const user = usersDB[savedUserKey];
-        currentUserName = user.name;
-        currentUserType = user.type;
-
-        if (savedInRoom) {
-          enterRoom();
-        } else {
-          if (user.type === "student") {
-            document.getElementById('st-name').innerText = user.name;
-            document.getElementById('st-rating').innerText = user.rating;
-            document.getElementById('st-teacher').innerText = user.teacher;
-            document.getElementById('auth-screen').classList.add('hidden');
-            document.getElementById('student-dash').classList.remove('hidden');
-          } else if (user.type === "teacher") {
-            document.getElementById('tr-name').innerText = user.name;
-            document.getElementById('auth-screen').classList.add('hidden');
-            document.getElementById('teacher-dash').classList.remove('hidden');
-          }
-        }
-      }
-    };
-
-    function handleLogin() {
-      const loginInput = document.getElementById('username').value.trim();
-      const passInput = document.getElementById('password').value.trim();
-      const errorDiv = document.getElementById('login-error');
-
-      errorDiv.innerText = "";
-      const user = usersDB[loginInput];
-
-      if (!user || user.pass !== passInput) {
-        errorDiv.innerText = "Неверный логин или пароль!";
-        return;
-      }
-
-      currentUserName = user.name;
-      currentUserType = user.type;
-
-      sessionStorage.setItem('chess_current_user_key', loginInput);
-
-      if (user.type === "student") {
-        document.getElementById('st-name').innerText = user.name;
-        document.getElementById('st-rating').innerText = user.rating;
-        document.getElementById('st-teacher').innerText = user.teacher;
-
-        document.getElementById('auth-screen').classList.add('hidden');
-        document.getElementById('student-dash').classList.remove('hidden');
-      } 
-      else if (user.type === "teacher") {
-        document.getElementById('tr-name').innerText = user.name;
-
-        document.getElementById('auth-screen').classList.add('hidden');
-        document.getElementById('teacher-dash').classList.remove('hidden');
-      }
-    }
-
-    function handleLogout() {
-      sessionStorage.removeItem('chess_current_user_key');
-      sessionStorage.removeItem('chess_in_room');
-      location.reload();
-    }
-
-    function startLessonByTeacher() {
-      enterRoom();
-    }
-
-    // Главный цикл мониторинга событий (вызовы, доска учителя, партии)
-    setInterval(() => {
-      // Проверка входящего вызова каждые 300мс
-      const targetUser = localStorage.getItem('chess_challenge_target');
-      if (targetUser === currentUserName) {
-        const challenger = localStorage.getItem('chess_challenger_name');
-        if (challenger) {
-          document.getElementById('challenger-text').innerText = `Вам кинул вызов "${challenger}"`;
-          document.getElementById('incoming-challenge').classList.remove('hidden');
-        }
-      }
-
-      const drawTarget = localStorage.getItem('chess_draw_target');
-      if (drawTarget === currentUserName) {
-        document.getElementById('incoming-draw').classList.remove('hidden');
-        localStorage.removeItem('chess_draw_target');
-      }
-
-      if (activeGameId) {
-        const resignedBy = localStorage.getItem(`match_resigned_${activeGameId}`);
-        if (resignedBy && resignedBy !== currentUserName) {
-          alert("Соперник сдался! Вы победили 🎉");
-          endGameCleanUp();
-        }
-      }
-
-      if (activeGameId) {
-        let savedFen = localStorage.getItem(`match_fen_${activeGameId}`);
-        if (savedFen && savedFen !== game.fen()) {
-          game.load(savedFen);
-          if (board) board.position(savedFen, false);
-          if (virtualBoard) virtualBoard.position(savedFen, false);
-          if (fullscreenBoard) fullscreenBoard.position(savedFen, false);
-        }
-      }
-
-      // Синхронизация виртуальной камеры учителя у учеников
-      let teacherCamFen = localStorage.getItem('teacher_virtual_cam_fen');
-      let teacherCamActiveState = localStorage.getItem('teacher_virtual_cam_active') === 'true';
-
-      if (currentUserType === 'student') {
-        const virtualCamDiv = document.getElementById('teacher-virtual-cam');
-
-        if (teacherCamActiveState) {
-          virtualCamDiv.classList.remove('hidden');
-          if (teacherCamFen) {
-            if (!window.studentVirtualBoard) {
-              window.studentVirtualBoard = Chessboard('virtual-board', {
-                position: teacherCamFen,
-                pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
-              });
-            } else {
-              window.studentVirtualBoard.position(teacherCamFen);
-            }
-          }
-        } else {
-          virtualCamDiv.classList.add('hidden');
-        }
-      }
-
-      if (currentUserType === 'teacher' && !document.getElementById('lesson-room').classList.contains('hidden')) {
-        updateTeacherMiniBoards();
-      }
-    }, 300);
-
-    function loadJitsiVideo() {
-      const wrapper = document.getElementById('video-wrapper');
-      if (!document.getElementById('jitsi-iframe')) {
-        wrapper.innerHTML = `<iframe id="jitsi-iframe" src="https://meet.jit.si/MrQafurChessMasterClass2026#config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.p2p.enabled=true&interfaceConfigView.TOOLBAR_BUTTONS=['microphone','camera','fullscreen','chat','raise-hand']" allow="camera; microphone; fullscreen; display-capture" style="width:100%; height:100%; border:none;"></iframe>`;
-      }
-    }
-
-    // Показ всех доступных пользователей в списке вызовов
-    function openChallengeList() {
-      const dropdown = document.getElementById('users-dropdown');
-      dropdown.innerHTML = "";
-      dropdown.classList.toggle('hidden');
-
-      for (let key in usersDB) {
-        let u = usersDB[key];
-        if (u.name !== currentUserName) {
-          let item = document.createElement('div');
-          item.className = 'user-item';
-          item.innerText = u.name;
-          item.onclick = function() {
-            sendChallenge(u.name);
-            dropdown.classList.add('hidden');
-          };
-          dropdown.appendChild(item);
-        }
-      }
-    }
-
-    function sendChallenge(receiverName) {
-      localStorage.setItem('chess_challenger_name', currentUserName);
-      localStorage.setItem('chess_challenge_target', receiverName);
-      opponentName = receiverName;
-      activeGameId = [currentUserName, receiverName].sort().join('_vs_');
-      myAssignedColor = 'white';
-      
-      localStorage.removeItem(`match_resigned_${activeGameId}`);
-      alert(`Вы отправили вызов игроку: ${receiverName}. Ожидаем подтверждения...`);
-      document.getElementById('color-info').innerText = `Ваш цвет: Белые ♔`;
-      document.getElementById('game-action-btns').classList.remove('hidden');
-      startNewGame('white');
-    }
-
-    function acceptChallenge() {
-      const challenger = localStorage.getItem('chess_challenger_name');
-      localStorage.removeItem('chess_challenge_target');
-      document.getElementById('incoming-challenge').classList.add('hidden');
-      
-      opponentName = challenger;
-      activeGameId = [currentUserName, challenger].sort().join('_vs_');
-      myAssignedColor = 'black'; 
-      
-      localStorage.removeItem(`match_resigned_${activeGameId}`);
-      alert(`Вызов принят! Партия началась. Вы играете за ЧЕРНЫХ ♚`);
-      document.getElementById('color-info').innerText = `Ваш цвет: Черные ♚`;
-      document.getElementById('game-action-btns').classList.remove('hidden');
-
-      startNewGame('black');
-    }
-
-    function rejectChallenge() {
-      alert("Вы отклонили вызов.");
-      localStorage.removeItem('chess_challenge_target');
-      document.getElementById('incoming-challenge').classList.add('hidden');
-    }
-
-    function startNewGame(playerColor) {
-      game.reset();
-      if (board) {
-        board.orientation(playerColor);
-        board.position('start');
-      }
-      if (virtualBoard) {
-        virtualBoard.position('start');
-      }
-      if (fullscreenBoard) {
-        fullscreenBoard.position('start');
-      }
-
-      whiteTime = 600;
-      blackTime = 600;
-      updateTimerDisplay();
-      
-      if (timerInterval) clearInterval(timerInterval);
-      timerInterval = setInterval(runTimer, 1000);
-      
-      if (activeGameId) {
-        localStorage.setItem(`match_fen_${activeGameId}`, game.fen());
-        if (isVirtualCamActive) localStorage.setItem('teacher_virtual_cam_fen', game.fen());
-      }
-    }
-
-    function runTimer() {
-      if (game.game_over()) {
-        clearInterval(timerInterval);
-        return;
-      }
-      if (game.turn() === 'w') { if (whiteTime > 0) whiteTime--; } 
-      else { if (blackTime > 0) blackTime--; }
-      updateTimerDisplay();
-    }
-
-    function updateTimerDisplay() {
-      const format = (sec) => {
-        let m = Math.floor(sec / 60);
-        let s = sec % 60;
-        return `${m}:${s < 10 ? '0' : ''}${s}`;
-      };
-      document.getElementById('white-timer').innerText = format(whiteTime);
-      document.getElementById('black-timer').innerText = format(blackTime);
-    }
-
-    function onDragStart (source, piece) {
-      if (game.game_over()) return false;
-
-      if (currentUserType === 'teacher' && activeGameId) {
-        if (myAssignedColor === 'white' && piece.search(/^b/) !== -1) return false;
-        if (myAssignedColor === 'black' && piece.search(/^w/) !== -1) return false;
-        if (game.turn() !== myAssignedColor[0]) return false;
-        return;
-      }
-
-      if (currentUserType === 'teacher' && !activeGameId) {
-        return true; 
-      }
-
-      if (currentUserType === 'student') {
-        if (myAssignedColor === 'white' && piece.search(/^b/) !== -1) return false;
-        if (myAssignedColor === 'black' && piece.search(/^w/) !== -1) return false;
-        if (game.turn() !== myAssignedColor[0]) return false; 
-      }
-    }
-
-    function onDrop (source, target) {
-      var move = game.move({ from: source, to: target, promotion: 'q' });
-      if (move === null) return 'snapback';
-
-      if (activeGameId) {
-        if (game.turn() === 'b') { whiteTime += 5; } else { blackTime += 5; }
-        updateTimerDisplay();
-      }
-      
-      if (board) board.position(game.fen());
-      if (virtualBoard) virtualBoard.position(game.fen());
-      if (fullscreenBoard) fullscreenBoard.position(game.fen());
-
-      if (activeGameId) {
-        localStorage.setItem(`match_fen_${activeGameId}`, game.fen());
-      }
-      if (currentUserType === 'teacher' && isVirtualCamActive) {
-        localStorage.setItem('teacher_virtual_cam_fen', game.fen());
-      }
-      if (currentUserType === 'teacher' && !activeGameId) {
-        localStorage.setItem('teacher_broadcast_fen', game.fen());
-      }
-    }
-
-    function resignGame() {
-      if (confirm("Вы уверены, что хотите сдаться?")) {
-        if (activeGameId) {
-          localStorage.setItem(`match_resigned_${activeGameId}`, currentUserName);
-        }
-        alert("Вы признали поражение.");
-        endGameCleanUp();
-      }
-    }
-
-    function endGameCleanUp() {
-      document.getElementById('game-action-btns').classList.add('hidden');
-      if (timerInterval) clearInterval(timerInterval);
-      game.reset();
-      if (board) board.position('start');
-      if (virtualBoard) virtualBoard.position('start');
-      if (fullscreenBoard) fullscreenBoard.position('start');
-      if (activeGameId) {
-        localStorage.removeItem(`match_fen_${activeGameId}`);
-        localStorage.removeItem(`match_resigned_${activeGameId}`);
-      }
-      activeGameId = null;
-      document.getElementById('color-info').innerText = "";
-    }
-
-    function offerDraw() {
-      if (opponentName) {
-        localStorage.setItem('chess_draw_target', opponentName);
-        alert("Предложение ничьей отправлено сопернику.");
-      }
-    }
-
-    function acceptDraw() {
-      document.getElementById('incoming-draw').classList.add('hidden');
-      alert("Ничья принята! Партия завершена.");
-      endGameCleanUp();
-    }
-
-    function rejectDraw() {
-      document.getElementById('incoming-draw').classList.add('hidden');
-      alert("Соперник отклонил предложение ничьей.");
-    }
-
-    function enterRoom() {
-      document.getElementById('auth-screen').classList.add('hidden');
-      document.getElementById('student-dash').classList.add('hidden');
-      document.getElementById('teacher-dash').classList.add('hidden');
-      document.getElementById('lesson-room').classList.remove('hidden');
-
-      sessionStorage.setItem('chess_in_room', 'true');
-
-      loadJitsiVideo();
-
-      if (currentUserType === 'teacher') {
-        document.getElementById('teacher-monitoring').classList.remove('hidden');
-        document.getElementById('teacher-tools').classList.remove('hidden');
-        document.getElementById('color-info').innerText = "Режим учителя: Свободная доска / Трансляции";
-      }
-
-      setTimeout(() => {
-        if (!board) {
-          board = Chessboard('board', {
-            draggable: true,
-            position: 'start',
-            dropOffBoard: 'trash',
-            onDragStart: onDragStart,
-            onDrop: onDrop,
-            pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
-          });
-        }
-        if (!virtualBoard && currentUserType === 'teacher') {
-          virtualBoard = Chessboard('virtual-board', {
-            draggable: true,
-            position: 'start',
-            dropOffBoard: 'trash',
-            onDragStart: onDragStart,
-            onDrop: onDrop,
-            pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
-          });
-        }
-      }, 400);
-    }
-
-    function updateTeacherMiniBoards() {
-      const grid = document.getElementById('mini-boards-grid');
-      
-      for (let key in usersDB) {
-        let u = usersDB[key];
-        if (u.name !== currentUserName) {
-          let fen = 'start';
-
-          for (let gKey in localStorage) {
-            if (gKey.startsWith('match_fen_') && gKey.includes(u.name)) {
-              fen = localStorage.getItem(gKey);
-              break;
-            }
-          }
-          
-          let cardId = `minicard_${key}`;
-          let card = document.getElementById(cardId);
-
-          if (!card) {
-            card = document.createElement('div');
-            card.className = 'mini-board-card';
-            card.id = cardId;
-            card.innerHTML = `
-              <span>${u.name}</span>
-              <div class="mini-board" id="board_${key}"></div>
-              <button onclick="broadcastUser('${u.name}')" style="font-size:10px; padding:2px 6px; margin-top:4px; background:#0052cc;">Демо</button>
-            `;
-            grid.appendChild(card);
-
-            window[`miniObj_${key}`] = Chessboard(`board_${key}`, {
-              position: fen,
-              pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
-            });
-          } else {
-            let boardObj = window[`miniObj_${key}`];
-            if (boardObj) {
-              boardObj.position(fen);
-            }
-          }
-        }
-      }
-    }
-
-    function broadcastUser(userName) {
-      for (let gKey in localStorage) {
-        if (gKey.startsWith('match_fen_') && gKey.includes(userName)) {
-          let fen = localStorage.getItem(gKey);
-          game.load(fen);
-          if (board) board.position(fen);
-          if (virtualBoard) virtualBoard.position(fen);
-          if (fullscreenBoard) fullscreenBoard.position(fen);
-          activeGameId = gKey.replace('match_fen_', '');
-          alert(`Учитель открыл демонстрацию партии игрока: ${userName}`);
-          return;
-        }
-      }
-      alert("У этого игрока активная доска пуста или партия не начата.");
-    }
-
-    function showTeacherBoard() {
-      endGameCleanUp();
-      game.reset();
-      if (board) board.position('start');
-      if (virtualBoard) virtualBoard.position('start');
-      if (fullscreenBoard) fullscreenBoard.position('start');
-      localStorage.removeItem('teacher_virtual_cam_fen');
-      document.getElementById('color-info').innerText = "Ваша личная доска (можно двигать фигуры)";
-      alert("Открыта ваша личная свободная доска.");
-    }
-
-    function resetTeacherBoard() {
-      game.reset();
-      if (board) board.position('start');
-      if (virtualBoard) virtualBoard.position('start');
-      if (fullscreenBoard) fullscreenBoard.position('start');
-      if (isVirtualCamActive) localStorage.setItem('teacher_virtual_cam_fen', game.fen());
-      localStorage.setItem('teacher_broadcast_fen', game.fen());
-    }
-
-    function clearTeacherBoard() {
-      game.clear();
-      if (board) board.position('empty');
-      if (virtualBoard) virtualBoard.position('empty');
-      if (fullscreenBoard) virtualBoard.position('empty');
-      if (isVirtualCamActive) localStorage.setItem('teacher_virtual_cam_fen', game.fen());
-      localStorage.setItem('teacher_broadcast_fen', game.fen());
-    }
-
-    function broadcastTeacherBoard() {
-      localStorage.setItem('teacher_broadcast_fen', game.fen());
-      alert("Ваша доска транслируется всем ученикам!");
-    }
-
-    function toggleVirtualCam() {
-      isVirtualCamActive = !isVirtualCamActive;
-      const virtualCamDiv = document.getElementById('teacher-virtual-cam');
-      const btn = document.getElementById('cam-toggle-btn');
-
-      if (isVirtualCamActive) {
-        virtualCamDiv.classList.remove('hidden');
-        btn.innerText = "Вернуть камеру (видеочат)";
-        btn.style.background = "#ff5630";
-        localStorage.setItem('teacher_virtual_cam_active', 'true');
-        localStorage.setItem('teacher_virtual_cam_fen', game.fen());
-        alert("Доска транслируется вместо камеры для всех учеников!");
-      } else {
-        virtualCamDiv.classList.add('hidden');
-        btn.innerText = "Показать доску вместо камеры";
-        btn.style.background = "#36b37e";
-        localStorage.setItem('teacher_virtual_cam_active', 'false');
-        alert("Включена обратно видеокамера.");
-      }
-    }
-
-    function toggleFullscreenBoard() {
-      isFullscreenOpen = !isFullscreenOpen;
-      const overlay = document.getElementById('fullscreen-overlay');
-      const teacherPanel = document.getElementById('fullscreen-teacher-panel');
-
-      if (isFullscreenOpen) {
-        overlay.classList.remove('hidden');
-        if (currentUserType === 'teacher' && !activeGameId) {
-          teacherPanel.classList.remove('hidden');
-        } else {
-          teacherPanel.classList.add('hidden');
-        }
-
-        setTimeout(() => {
-          if (!fullscreenBoard) {
-            fullscreenBoard = Chessboard('fullscreen-board', {
-              draggable: true,
-              position: game.fen(),
-              dropOffBoard: 'trash',
-              onDragStart: onDragStart,
-              onDrop: onDrop,
-              pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
-            });
-          } else {
-            fullscreenBoard.position(game.fen());
-          }
-        }, 100);
-      } else {
-        overlay.classList.add('hidden');
-      }
-    }
-
-    function onShelfDrag(event, pieceCode) {
-      event.dataTransfer.setData('text/plain', pieceCode);
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      document.body.addEventListener('dragover', (e) => e.preventDefault());
-      document.body.addEventListener('drop', (e) => {
-        const piece = e.dataTransfer.getData('text/plain');
-        if (piece && isFullscreenOpen && currentUserType === 'teacher' && !activeGameId) {
-          const boardEl = document.getElementById('fullscreen-board');
-          const rect = boardEl.getBoundingClientRect();
-          if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-            let x = Math.floor((e.clientX - rect.left) / (rect.width / 8));
-            let y = Math.floor((e.clientY - rect.top) / (rect.height / 8));
-            let files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-            let ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
-            let square = files[x] + ranks[y];
-
-            game.put({ type: piece[1].toLowerCase(), color: piece[0] }, square);
-            if (board) board.position(game.fen());
-            if (virtualBoard) virtualBoard.position(game.fen());
-            if (fullscreenBoard) fullscreenBoard.position(game.fen());
-            if (isVirtualCamActive) localStorage.setItem('teacher_virtual_cam_fen', game.fen());
-            localStorage.setItem('teacher_broadcast_fen', game.fen());
-          }
-        }
-      });
-    });
-  </script>
-</body>
-</html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Шахматный класс</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+<style>
+.clearfix-7da63:after{content:'.';visibility:hidden;display:block;height:0;clear:both}
+.board-b72b1{border:2px solid #404040;box-sizing:content-box}.board-b72b1 *{box-sizing:content-box}
+.square-55d63{float:left;position:relative;user-select:none;-webkit-user-select:none}
+.white-1e1d7{background:#f0d9b5;color:#b58863}.black-3c85d{background:#b58863;color:#f0d9b5}
+.highlight1-32417,.highlight2-9c5d2{box-shadow:inset 0 0 3px 3px #ff0}
+.notation-322f9{cursor:default;font:14px Helvetica,Arial;position:absolute}.alpha-d2270{bottom:1px;right:3px}.numeric-fc462{top:2px;left:2px}
+.piece-417db{width:100%;height:100%}.spare-pieces-7492f{padding:0}
+*{box-sizing:border-box}body{margin:0;font-family:'Segoe UI',sans-serif;background:#f3efe6;color:#2b2b2b}
+.hide{display:none!important}.card{background:#fff;border-radius:18px;box-shadow:0 4px 14px rgba(0,0,0,.09);padding:16px;margin:12px}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 18px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.08)}.bar b{flex:1}
+button,.b{border:0;border-radius:10px;padding:8px 14px;background:#3b82c4;color:#fff;font:inherit;cursor:pointer;margin:2px}
+button.g{background:#5a9a3c}button.red{background:#c44b3b}button.gray{background:#8a8a8a}button:disabled{background:#bbb;cursor:not-allowed}
+input,textarea{font:inherit;padding:8px;border:1px solid #ccc;border-radius:10px}
+#login .card{max-width:340px;margin:12vh auto;text-align:center}#login input{width:100%;margin:6px 0}#err{color:#c44b3b;min-height:20px}
+.ok{color:#3b8a2c;font-weight:600;margin-bottom:6px}.st{border-top:1px solid #eee;padding:10px 0}.st textarea{width:100%;height:50px}.st input{width:90px}
+.grid{display:grid;grid-template-columns:1.3fr 1fr;gap:0}@media(max-width:900px){.grid{grid-template-columns:1fr}}
+#camWrap{position:relative;height:430px;border-radius:12px;overflow:hidden;background:#222}#jf{width:100%;height:100%;border:0}
+#vcam{position:absolute;inset:0;background:#f3efe6;display:flex;flex-direction:column;align-items:center;justify-content:center}#vcamb{width:400px;max-width:90%}
+#bd{width:100%;max-width:440px;margin:auto}.clk{font-weight:700;font-size:18px;padding:4px 8px;background:#eef3e8;border-radius:8px;max-width:440px;margin:6px auto}
+#stat{text-align:center;margin-bottom:4px;color:#555}.row{text-align:center;margin-top:8px}
+.mini{display:inline-block;width:150px;text-align:center;margin:6px;vertical-align:top;font-size:12px}
+.tab{background:#ddd;color:#333}.tab.on{background:#5a9a3c;color:#fff}.hl{border-top:1px solid #eee;padding:6px 0;font-size:14px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:50}
+.modal .card{max-height:94vh;overflow:auto;margin:0}#fsb{width:450px}
+#notice{position:fixed;top:14px;right:14px;z-index:99;background:#fff;border-left:6px solid #5a9a3c;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.25);padding:14px 18px;max-width:320px}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:8px 16px;border-radius:20px;z-index:99}
+</style></head><body>
+
+<div id="login"><div class="card"><h2>♞ Шахматный класс</h2>
+<input id="lg" placeholder="Логин"><input id="ps" type="password" placeholder="Пароль" onkeydown="if(event.key=='Enter')login()">
+<div id="err"></div><button class="g" onclick="login()">Войти</button></div></div>
+
+<div id="cab" class="hide"><div class="bar"><b id="cabName"></b><button class="red" onclick="logout()">Выйти из аккаунта</button></div>
+<div class="card" id="lessonBox"></div><div id="cabBody"></div></div>
+
+<div id="room" class="hide"><div class="bar"><b>♟ Комната урока</b>
+<button class="gray" onclick="go('cab')">В кабинет</button><button onclick="rejoin()">🔄 Переподключить видео</button><button class="g" onclick="openPick()">Кинуть вызов</button></div>
+<div class="grid"><div>
+<div class="card"><div id="camWrap"><iframe id="jf" allow="camera;microphone;display-capture;fullscreen;autoplay"></iframe>
+<div id="vcam" class="hide"><div id="vcamb"></div><b>Доска учителя</b></div></div>
+<div id="tools" class="row hide"><button class="g" onclick="pos0()">Начальная позиция</button><button class="red" onclick="clr()">Очистить доску</button>
+<button id="bCam" onclick="camSet(!camOn)">Показать доску вместо камеры</button></div></div>
+<div class="card hide" id="tp"><button class="tab on" id="t1" onclick="tab(1)">Партии сейчас</button><button class="tab" id="t2" onclick="tab(2)">Проведённые партии</button>
+<div id="minis"></div><div id="noMini">Сейчас никто не играет</div><div id="hist" class="hide"></div></div>
+</div>
+<div class="card"><div id="stat"></div><div class="clk" id="ct"></div><div id="bd"></div><div class="clk" id="cb"></div>
+<div class="row"><button id="bBack" class="gray hide" onclick="back()">← К моей доске</button><button onclick="openFs()">🔲 Развернуть доску (на полэкрана)</button>
+<button id="bR" class="red hide" onclick="resign()">Сдаться</button><button id="bD" class="hide" onclick="offerDraw()">Ничья</button></div></div></div></div>
+
+<div id="fs" class="modal hide"><div class="card"><div id="fsb"></div><div class="row"><span id="fsTools"><button class="g" onclick="pos0()">Начальная позиция</button><button class="red" onclick="clr()">Очистить</button></span><button class="gray" onclick="closeFs()">Закрыть</button></div></div></div>
+<div id="pick" class="modal hide"><div class="card"><h3>Кому бросить вызов?</h3><div id="pl"></div><button class="gray" onclick="$('pick').classList.add('hide')">Отмена</button></div></div>
+<div id="notice" class="hide"></div><div id="toast" class="hide"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+<script>window.Chessboard||document.write('<script src="https://cdn.jsdelivr.net/npm/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"><\/script>')</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script>window.Chess||document.write('<script src="https://cdn.jsdelivr.net/npm/chess.js@0.10.3/chess.min.js"><\/script>')</script>
+<script>
+const START='rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',EMPTY='8/8/8/8/8/8/8/8 w - - 0 1';
+const usersDB={teacher:[{id:'MrQafri-0620',name:'Гафур Мустафа',pass:'0620'}],students:[
+{id:'Murik-855',name:'Мурад Солтанов',pass:'865789',rating:100},{id:'kenancik228',name:'Кянан Алиев',pass:'263573',rating:100},
+{id:'redjohn335',name:'Исмаилов Омяр',pass:'937637',rating:950},{id:'professor-562',name:'Джавад Багырлы',pass:'023846',rating:100},
+{id:'more788',name:'Дениз Новрузлу',pass:'040567',rating:450},{id:'elsik437',name:'Эльсевер Гусейнов',pass:'487598',rating:280}]};
+const ALL=[...usersDB.teacher.map(u=>({...u,role:'t'})),...usersDB.students.map(u=>({...u,role:'s'}))];
+const GR={weak:'Слабые'},GL={K:'♚',Q:'♛',R:'♜',B:'♝',N:'♞',P:'♟'};
+const theme=p=>'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45"><text x="22.5" y="37" font-size="40" text-anchor="middle" font-family="Segoe UI Symbol,Arial Unicode MS,DejaVu Sans,sans-serif" fill="'+(p[0]==='w'?'#fff':'#111')+'" stroke="#111" stroke-width="'+(p[0]==='w'?1.3:0.5)+'">'+GL[p[1]]+'</text></svg>');
+const $=id=>document.getElementById(id),G=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},S=(k,v)=>localStorage.setItem(k,JSON.stringify(v)),
+esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let me,game=new Chess(),board,fsb,vcam,mode='free',mid=null,viewFen=START,freeFen=START,camOn=false,loose=false,minis={},seenChal=0,seenRes=0,done={},ownId=null,busy=0,curView='cab',jLoaded=false,curChal=null;
+const T=()=>me.role==='t',user=id=>ALL.find(u=>u.id===id),nm=id=>user(id).name,STU=()=>ALL.filter(u=>u.role==='s'),
+cls=()=>G('cls')||{r:{},n:{},g:{}},rate=u=>cls().r[u.id]??u.rating,lessonOn=()=>{const l=G('lesson');return !!(l&&l.active)};
+function toast(t){const e=$('toast');e.textContent=t;e.classList.remove('hide');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.add('hide'),3000)}
+function note(h){const n=$('notice');n.innerHTML=h+'<div class="row"><button onclick="$(\'notice\').classList.add(\'hide\')">OK</button></div>';n.classList.remove('hide')}
+
+/* ---------- вход / сессия ---------- */
+function login(){const u=ALL.find(x=>x.id===$('lg').value.trim()&&x.pass===$('ps').value);
+ if(!u){$('err').textContent='Неверный логин или пароль';return}sessionStorage.setItem('u',u.id);sessionStorage.setItem('v','cab');start(u)}
+function logout(){sessionStorage.clear();location.reload()}
+function start(u){me=u;$('cabName').textContent=u.name+(T()?' (учитель)':'');if(T())S('teacher_virtual_cam_fen',{on:false});
+ go(sessionStorage.getItem('v')==='room'&&lessonOn()?'room':'cab');setInterval(tick,500);window.addEventListener('storage',tick)}
+function go(v){curView=v;sessionStorage.setItem('v',v);$('login').classList.add('hide');['cab','room'].forEach(x=>$(x).classList.toggle('hide',x!==v));v==='room'?initRoom():renderCab()}
+
+/* ---------- кабинет ---------- */
+function lessonHtml(){const on=lessonOn();
+ if(T())return on?'<div class="ok">🟢 Урок идёт</div><button class="g" onclick="go(\'room\')">Войти в урок</button><button class="red" onclick="endL()">Завершить урок</button>':'<div>⚪ Урок не начат</div><button class="g" onclick="startL()">Начать урок</button>';
+ return on?'<div class="ok">🟢 Урок начат</div><button class="g" onclick="go(\'room\')">Присоединиться</button>':'<div>⚪ Учитель ещё не начал урок</div><button disabled>Присоединиться</button>'}
+function startL(){S('lesson',{active:true,ts:Date.now()});S('teacher_virtual_cam_fen',{on:false});go('room')}
+function endL(){if(!confirm('Завершить урок для всех?'))return;S('lesson',{active:false});camSet(false);go('cab')}
+function stuBody(){const n=(cls().n[me.id]||[]).slice().reverse();
+ return '<div class="card"><h3>Мой рейтинг: '+rate(me)+'</h3></div><div class="card"><h3>Замечания учителя</h3>'+(n.length?n.map(x=>'<div class="hl"><small>'+new Date(x.t).toLocaleString()+'</small><br>'+esc(x.x)+'</div>').join(''):'Замечаний нет')+'</div>'}
+function teacherBody(){const c=cls();return Object.keys(GR).map(g=>{const l=STU().map((u,i)=>[u,i]).filter(([u])=>(c.g[u.id]||'weak')===g);
+ return '<div class="card"><h3>Группа «'+GR[g]+'» ('+l.length+')</h3>'+l.map(([u,i])=>'<div class="st"><b>'+u.name+'</b> <small>'+u.id+'</small><div>Рейтинг: <input type="number" id="r'+i+'" value="'+rate(u)+'"><button onclick="setR('+i+')">Сохранить</button></div>'+
+ ((c.n[u.id]||[]).map((x,k)=>'<div class="hl">'+esc(x.x)+' <button class="gray" onclick="delN('+i+','+k+')">×</button></div>').join(''))+
+ '<textarea id="n'+i+'" placeholder="Замечание ученику"></textarea><button class="g" onclick="addN('+i+')">Отправить замечание</button></div>').join('')+'</div>'}).join('')}
+function renderCab(){const h=T()?teacherBody():stuBody();$('cabBody').innerHTML=h;$('cabBody').dataset.h=h;$('lessonBox').dataset.h='';tick()}
+function setR(i){const v=parseInt($('r'+i).value);if(isNaN(v))return;const c=cls();c.r[STU()[i].id]=v;S('cls',c);toast('Рейтинг сохранён')}
+function addN(i){const t=$('n'+i).value.trim();if(!t)return;const c=cls(),id=STU()[i].id;(c.n[id]=c.n[id]||[]).push({t:Date.now(),x:t});S('cls',c);renderCab()}
+function delN(i,k){const c=cls();c.n[STU()[i].id].splice(k,1);S('cls',c);renderCab()}
+
+/* ---------- комната / видео ---------- */
+const JROOM='https://meet.jit.si/MrQafurChessMasterClass2026';
+function jurl(){const tb=encodeURIComponent(JSON.stringify(['microphone','camera','desktop','fullscreen','tileview','chat','hangup','settings']));
+ return JROOM+'#config.p2p.enabled=true&config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.toolbarButtons='+tb+'&userInfo.displayName='+encodeURIComponent(JSON.stringify(me.name))}
+function rejoin(){$('jf').src='about:blank';setTimeout(()=>$('jf').src=jurl(),300)}
+function initRoom(){if(!window.Chessboard||!window.Chess){alert('Не загрузились библиотеки доски (Chessboard.js / Chess.js). Проверьте интернет или отключите блокировщик и обновите страницу.');return}
+ if(!board){board=Chessboard('bd',{position:freeFen,pieceTheme:theme,draggable:true,onDragStart:ds,onDrop:dr,onSnapEnd:se});
+ $('tools').classList.toggle('hide',!T());$('tp').classList.toggle('hide',!T())}
+ if(!jLoaded){jLoaded=true;$('jf').src=jurl()}board.resize();refresh()}
+window.addEventListener('resize',()=>{board&&board.resize();vcam&&vcam.resize()});
+function tab(n){$('t1').classList.toggle('on',n==1);$('t2').classList.toggle('on',n==2);$('minis').classList.toggle('hide',n!=1);$('noMini').dataset.t=n;$('hist').classList.toggle('hide',n!=2)}
+
+/* ---------- доска ---------- */
+const myMatch=()=>{const id=G('active_'+me.id);return id?G('match_fen_'+id):null},col=m=>m.w===me.id?'w':'b';
+const rem=(m,c)=>m[c+'t']-(m.status==='play'&&m.ts!==null&&m.turn===c?Date.now()-m.ts:0);
+function curFen(){if(mode==='match'){const m=myMatch();return m?m.fen:freeFen}
+ if(mode==='view'){const m=mid&&G('match_fen_'+mid);return m?m.fen:viewFen}return freeFen}
+function refresh(){const f=curFen(),b=f.split(' ')[0];[board,fsb].forEach(x=>{if(x&&x.fen()!==b)x.position(f,false)});
+ if(T()&&camOn)S('teacher_virtual_cam_fen',{on:true,fen:f});ui()}
+function ds(src,piece){
+ if(mode==='view')return false;
+ if(mode==='match'){const m=myMatch();if(!m||m.status!=='play'||m.turn!==col(m)||piece[0]!==m.turn)return false;game.load(m.fen);return}
+ loose=!game.load(freeFen);if(!loose&&game.game_over())return false}
+function dr(s,t){if(t==='offboard')return 'snapback';if(loose)return;
+ const mv=game.move({from:s,to:t,promotion:'q'});if(!mv)return 'snapback';
+ if(mode==='match')commit(mv);else freeFen=game.fen()}
+function se(){if(loose&&mode==='free'&&T()&&board)freeFen=Chessboard.objToFen(board.position())+' w - - 0 1';refresh()}
+function commit(mv){const m=myMatch(),c=m.turn;if(m.ts!==null)m[c+'t']=rem(m,c)+5000;
+ m.fen=game.fen();m.turn=c==='w'?'b':'w';m.moves.push(mv.san);m.ts=Date.now();m.draw=null;S('match_fen_'+m.id,m);
+ if(game.in_checkmate())fin(m,c==='w'?'1-0':'0-1','checkmate');else if(game.in_draw())fin(m,'1/2-1/2','draw')}
+function fin(m,res,why){m=G('match_fen_'+m.id);if(!m||m.status!=='play')return;m.status='over';m.result=res;m.reason=why;S('match_fen_'+m.id,m);
+ const h=G('history')||[];h.push({id:m.id,w:m.w,b:m.b,fen:m.fen,res,why,ts:Date.now(),moves:m.moves});S('history',h)}
+function msg(m){const w=m.result==='1-0'?m.w:m.result==='0-1'?m.b:null;if(!w)return '🤝 Партия завершилась вничью';const win=w===me.id;
+ const R={resign:win?'соперник сдался':'вы сдались',timeout:win?'у соперника вышло время':'у вас вышло время',checkmate:'мат'}[m.reason];
+ return win?'🏆 <b>Вы победили!</b> ('+R+')':'Вы проиграли ('+R+')'}
+function resign(){const m=myMatch();if(m&&m.status==='play'&&confirm('Точно сдаться?'))fin(m,col(m)==='w'?'0-1':'1-0','resign')}
+function offerDraw(){const m=myMatch();if(m&&m.status==='play'&&confirm('Предложить ничью?')){m.draw=me.id;S('match_fen_'+m.id,m);toast('Предложение отправлено')}}
+const fmt=ms=>{const s=Math.ceil(Math.max(0,ms)/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+function ui(){if(!board)return;const m=mode==='match'?myMatch():(mode==='view'&&mid?G('match_fen_'+mid):null);
+ ['ct','cb'].forEach(x=>$(x).classList.toggle('hide',!m));
+ let s=mode==='free'?(T()?'Ваша свободная доска':'Свободная доска (тренировка)'):mode==='view'&&!m?'Просмотр сыгранной партии':'';
+ if(m){const bt=mode==='match'&&m.b===me.id?'b':'w',tp=bt==='w'?'b':'w',l=(c,id)=>nm(m[id])+(c==='w'?' ⚪ ':' ⚫ ')+fmt(rem(m,c));
+  $('cb').textContent=l(bt,bt);$('ct').textContent=l(tp,tp);
+  s=(mode==='view'?'Просмотр: ':'')+(m.status==='play'?'Ход '+(m.turn==='w'?'белых':'чёрных'):'Партия окончена '+m.result)}
+ $('stat').textContent=s;const pl=mode==='match'&&m&&m.status==='play';$('bR').classList.toggle('hide',!pl);$('bD').classList.toggle('hide',!pl);
+ $('bBack').classList.toggle('hide',mode!=='view');$('bCam').textContent=camOn?'Вернуть камеру':'Показать доску вместо камеры'}
+
+/* ---------- инструменты учителя ---------- */
+function ownFree(){const m=myMatch();if(m&&m.status==='play'){alert('Идёт ваша партия');return false}mode='free';mid=null;return true}
+function pos0(){if(ownFree()){freeFen=START;refresh()}}
+function clr(){if(ownFree()){freeFen=EMPTY;refresh()}}
+function back(){const m=myMatch();if(m&&m.status==='play'){mode='match';mid=m.id}else{mode='free';mid=null}refresh()}
+function watch(id,cam){mode='view';mid=id;if(cam)camSet(true);refresh()}
+function watchH(i,cam){const h=(G('history')||[])[i];mode='view';mid=null;viewFen=h.fen;if(cam)camSet(true);refresh()}
+function camSet(on){camOn=on;if(!on)S('teacher_virtual_cam_fen',{on:false});refresh()}
+function camUpd(){const c=G('teacher_virtual_cam_fen'),on=!!(c&&c.on);$('vcam').classList.toggle('hide',!on);
+ if(on){if(!vcam)vcam=Chessboard('vcamb',{position:c.fen,pieceTheme:theme});else if(vcam.fen()!==c.fen.split(' ')[0])vcam.position(c.fen,false)}}
+function minisUpd(){const act=Object.keys(localStorage).filter(k=>k.startsWith('match_fen_')).map(G).filter(m=>m&&m.status==='play');
+ Object.keys(minis).forEach(id=>{if(!act.find(m=>m.id==id)){minis[id].destroy();delete minis[id];$('mw'+id)&&$('mw'+id).remove()}});
+ act.forEach(m=>{if(!minis[m.id]){const d=document.createElement('div');d.className='mini';d.id='mw'+m.id;
+  d.innerHTML='<div id="mb'+m.id+'" style="width:130px;margin:auto"></div>'+nm(m.w)+' — '+nm(m.b)+'<br><button onclick="watch('+m.id+')">Демо</button><button class="g" onclick="watch('+m.id+',1)">На камеру</button>';
+  $('minis').appendChild(d);minis[m.id]=Chessboard('mb'+m.id,{position:m.fen,pieceTheme:theme,showNotation:false})}
+  else if(minis[m.id].fen()!==m.fen.split(' ')[0])minis[m.id].position(m.fen,false)});
+ $('noMini').classList.toggle('hide',act.length>0||$('noMini').dataset.t==2)}
+function histUpd(){const h=G('history')||[];if($('hist').dataset.n==h.length)return;$('hist').dataset.n=h.length;
+ $('hist').innerHTML=h.length?h.map((x,i)=>[x,i]).reverse().map(([x,i])=>'<div class="hl">'+nm(x.w)+' — '+nm(x.b)+' <b>'+x.res+'</b> ('+x.why+', '+new Date(x.ts).toLocaleTimeString()+') <button onclick="watchH('+i+')">На мою доску</button><button class="g" onclick="watchH('+i+',1)">Вместо камеры</button></div>').join(''):'Сыгранных партий пока нет'}
+
+/* ---------- вызовы ---------- */
+function openPick(){$('pl').innerHTML=ALL.filter(u=>u.id!==me.id).map(u=>'<div class="hl"><button onclick="chal(\''+u.id+'\')">Вызвать</button> '+u.name+(u.role==='t'?' (учитель)':' · '+rate(u))+'</div>').join('');$('pick').classList.remove('hide')}
+function chal(to){const a=myMatch();if(a&&a.status==='play')return alert('Сначала закончите текущую партию');
+ const oid=G('active_'+to),o=oid&&G('match_fen_'+oid);if(o&&o.status==='play')return alert('Этот игрок сейчас в партии');
+ S('chal_'+to,{id:Date.now(),from:me.id,to});$('pick').classList.add('hide');toast('Вызов отправлен: '+nm(to))}
+function chals(){const c=G('chal_'+me.id);
+ if(c&&c.id!==seenChal&&Date.now()-c.id<120000){seenChal=c.id;curChal=c;const n=$('notice');
+  n.innerHTML='⚔ <b>'+nm(c.from)+'</b> бросает вам вызов!<br>10 мин + 5 сек за ход<div class="row"><button class="g" onclick="acc()">Принять</button><button class="red" onclick="dec()">Отклонить</button></div>';n.classList.remove('hide')}
+ const r=G('chalres_'+me.id);if(r&&r.id!==seenRes){seenRes=r.id;if(!r.ok)note(nm(r.by)+' отклонил(а) ваш вызов')}}
+function dec(){S('chalres_'+curChal.from,{id:curChal.id,ok:false,by:me.id});localStorage.removeItem('chal_'+me.id);$('notice').classList.add('hide')}
+function acc(){const c=G('chal_'+me.id);$('notice').classList.add('hide');if(!c)return;
+ const m={id:c.id,w:c.from,b:me.id,fen:START,wt:600000,bt:600000,ts:null,turn:'w',status:'play',moves:[],draw:null};
+ S('match_fen_'+m.id,m);S('active_'+m.w,m.id);S('active_'+m.b,m.id);localStorage.removeItem('chal_'+me.id);S('chalres_'+c.from,{id:c.id,ok:true,by:me.id})}
+function matches(){const m=myMatch();if(!m)return;
+ if(m.status==='play'){
+  if(ownId!==m.id){ownId=m.id;mode='match';mid=m.id;if(curView!=='room')go('room');board.orientation(m.w===me.id?'white':'black');if(fsb)fsb.orientation(board.orientation());loose=false;refresh()}
+  if(m.ts!==null&&rem(m,m.turn)<=0)fin(m,m.turn==='w'?'0-1':'1-0','timeout');
+  if(m.draw&&m.draw!==me.id&&!busy){busy=1;const ok=confirm(nm(m.draw)+' предлагает ничью. Принять?');busy=0;const x=G('match_fen_'+m.id);
+   if(x&&x.status==='play'){if(ok)fin(x,'1/2-1/2','draw');else{x.draw=null;S('match_fen_'+x.id,x)}}}
+ }else if(!done[m.id]){done[m.id]=1;localStorage.removeItem('active_'+me.id);note(msg(m));
+  if(mode==='match'){mode='free';mid=null;board&&board.orientation('white')}ownId=null;refresh()}}
+
+/* ---------- полный экран ---------- */
+function openFs(){$('fs').classList.remove('hide');const sp=T()&&mode==='free';$('fsTools').classList.toggle('hide',!sp);
+ fsb=Chessboard('fsb',sp?{position:freeFen,pieceTheme:theme,draggable:true,sparePieces:true,dropOffBoard:'trash',
+  onChange:(o,n)=>{const f=Chessboard.objToFen(n);if(f!==freeFen.split(' ')[0]){freeFen=f+' w - - 0 1';refresh()}}}
+  :{position:curFen(),pieceTheme:theme,draggable:mode!=='view',onDragStart:ds,onDrop:dr,onSnapEnd:se});fsb.orientation(board.orientation())}
+function closeFs(){fsb&&fsb.destroy();fsb=null;$('fs').classList.add('hide')}
+
+/* ---------- общий цикл ---------- */
+function tick(){if(!me)return;
+ const lb=lessonHtml(),box=$('lessonBox');if(box.dataset.h!==lb){box.dataset.h=lb;box.innerHTML=lb}
+ if(!T()&&curView==='cab'){const b=stuBody(),cb=$('cabBody');if(cb.dataset.h!==b){cb.dataset.h=b;cb.innerHTML=b}}
+ if(curView==='room'&&!T()&&!lessonOn()){note('Урок завершён учителем');go('cab')}
+ chals();if(board||curView==='room')matches();
+ if(curView==='room'&&board){refresh();camUpd();if(T()){minisUpd();histUpd()}}}
+const sid=sessionStorage.getItem('u');if(sid&&user(sid))start(user(sid));
+</script></body></html>
