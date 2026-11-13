@@ -49,7 +49,7 @@ input,textarea{font:inherit;padding:8px;border:1px solid #ccc;border-radius:10px
 <div id="minis"></div><div id="noMini">Сейчас никто не играет</div><div id="hist" class="hide"></div></div>
 </div>
 <div class="card"><div id="stat"></div><div class="clk" id="ct"></div><div id="bd"></div><div class="clk" id="cb"></div>
-<div class="row"><button id="bBack" class="gray hide" onclick="back()">← К моей доске</button><button onclick="openFs()">🔲 Развернуть доску (на полэкрана)</button>
+<div class="row"><button id="bFlip" class="hide" onclick="flipB()">🔄 Перевернуть доску</button><button id="bBack" class="gray hide" onclick="back()">← К моей доске</button><button onclick="openFs()">🔲 Развернуть доску (на полэкрана)</button>
 <button id="bR" class="red hide" onclick="resign()">Сдаться</button><button id="bD" class="hide" onclick="offerDraw()">Ничья</button></div></div></div></div>
 
 <div id="fs" class="modal hide"><div class="card"><div id="fsb"></div><div class="row"><span id="fsTools"><button class="g" onclick="pos0()">Начальная позиция</button><button class="red" onclick="clr()">Очистить</button></span><button class="gray" onclick="closeFs()">Закрыть</button></div></div></div>
@@ -110,7 +110,7 @@ function jurl(){const tb=encodeURIComponent(JSON.stringify(['microphone','camera
 function rejoin(){$('jf').src='about:blank';setTimeout(()=>$('jf').src=jurl(),300)}
 function initRoom(){if(!window.Chessboard||!window.Chess){alert('Не загрузились библиотеки доски (Chessboard.js / Chess.js). Проверьте интернет или отключите блокировщик и обновите страницу.');return}
  if(!board){board=Chessboard('bd',{position:freeFen,pieceTheme:theme,draggable:true,onDragStart:ds,onDrop:dr,onSnapEnd:se});
- $('tools').classList.toggle('hide',!T());$('tp').classList.toggle('hide',!T())}
+ $('bFlip').classList.toggle('hide',!T());$('tools').classList.toggle('hide',!T());$('tp').classList.toggle('hide',!T())}
  if(!jLoaded){jLoaded=true;$('jf').src=jurl()}board.resize();refresh()}
 window.addEventListener('resize',()=>{board&&board.resize();vcam&&vcam.resize()});
 function tab(n){$('t1').classList.toggle('on',n==1);$('t2').classList.toggle('on',n==2);$('minis').classList.toggle('hide',n!=1);$('noMini').dataset.t=n;$('hist').classList.toggle('hide',n!=2)}
@@ -120,8 +120,12 @@ const myMatch=()=>{const id=G('active_'+me.id);return id?G('match_fen_'+id):null
 const rem=(m,c)=>m[c+'t']-(m.status==='play'&&m.ts!==null&&m.turn===c?Date.now()-m.ts:0);
 function curFen(){if(mode==='match'){const m=myMatch();return m?m.fen:freeFen}
  if(mode==='view'){const m=mid&&G('match_fen_'+mid);return m?m.fen:viewFen}return freeFen}
-function refresh(){const f=curFen(),b=f.split(' ')[0];[board,fsb].forEach(x=>{if(x&&x.fen()!==b)x.position(f,false)});
- if(T()&&camOn)S('teacher_virtual_cam_fen',{on:true,fen:f});ui()}
+let flip=false;
+function setOri(){let b='white';if(mode==='match'){const m=myMatch();if(m&&m.b===me.id)b='black'}
+ const o=(b==='white')!==flip?'white':'black';[board,fsb].forEach(x=>{if(x&&x.orientation()!==o)x.orientation(o)});return o}
+function flipB(){flip=!flip;refresh()}
+function refresh(){const f=curFen(),b=f.split(' ')[0],o=setOri();[board,fsb].forEach(x=>{if(x&&x.fen()!==b)x.position(f,false)});
+ if(T()&&camOn)S('teacher_virtual_cam_fen',{on:true,fen:f,o});ui()}
 function ds(src,piece){
  if(mode==='view')return false;
  if(mode==='match'){const m=myMatch();if(!m||m.status!=='play'||m.turn!==col(m)||piece[0]!==m.turn)return false;game.load(m.fen);return}
@@ -159,7 +163,8 @@ function watch(id,cam){mode='view';mid=id;if(cam)camSet(true);refresh()}
 function watchH(i,cam){const h=(G('history')||[])[i];mode='view';mid=null;viewFen=h.fen;if(cam)camSet(true);refresh()}
 function camSet(on){camOn=on;if(!on)S('teacher_virtual_cam_fen',{on:false});refresh()}
 function camUpd(){const c=G('teacher_virtual_cam_fen'),on=!!(c&&c.on);$('vcam').classList.toggle('hide',!on);
- if(on){if(!vcam)vcam=Chessboard('vcamb',{position:c.fen,pieceTheme:theme});else if(vcam.fen()!==c.fen.split(' ')[0])vcam.position(c.fen,false)}}
+ if(on){if(!vcam)vcam=Chessboard('vcamb',{position:c.fen,pieceTheme:theme});else if(vcam.fen()!==c.fen.split(' ')[0])vcam.position(c.fen,false);
+  const o=c.o||'white';if(vcam.orientation()!==o)vcam.orientation(o)}}
 function minisUpd(){const act=Object.keys(localStorage).filter(k=>k.startsWith('match_fen_')).map(G).filter(m=>m&&m.status==='play');
  Object.keys(minis).forEach(id=>{if(!act.find(m=>m.id==id)){minis[id].destroy();delete minis[id];$('mw'+id)&&$('mw'+id).remove()}});
  act.forEach(m=>{if(!minis[m.id]){const d=document.createElement('div');d.className='mini';d.id='mw'+m.id;
